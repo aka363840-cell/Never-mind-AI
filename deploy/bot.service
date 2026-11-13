@@ -1,0 +1,17 @@
+[Unit]
+Description=Telegram game bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__DIR__
+ExecStart=__DIR__/.venv/bin/python bot.py
+Restart=always
+RestartSec=5
+# .env is read by the bot itself from WorkingDirectory
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

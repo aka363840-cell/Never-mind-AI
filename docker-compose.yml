@@ -1,0 +1,20 @@
+# Start:  ./deploy.sh      (or: docker compose up -d --build)
+# Logs:   docker compose logs -f bot
+services:
+  bot:
+    build: .
+    container_name: telegram-bot
+    restart: unless-stopped
+    env_file: .env                      # your keys stay in .env (never baked into the image)
+    environment:
+      # Inside Docker the database lives in the mounted ./data folder so it survives rebuilds/updates.
+      # (Remove these two lines to use whatever DATABASE_URL / BACKUP_DIR your .env says, e.g. PostgreSQL.)
+      DATABASE_URL: sqlite+aiosqlite:////data/bot.db
+      BACKUP_DIR: /data/backups
+    volumes:
+      - ./data:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
