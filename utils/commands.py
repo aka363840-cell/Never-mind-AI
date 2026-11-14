@@ -70,9 +70,13 @@ async def refresh_commands(bot: Bot) -> None:
     await setup_commands(bot)
     n = brand.name()
     try:
-        await bot.set_my_short_description(f"{brand.EMOJI} {n} — AI chat, economy, duels, dungeons, pets, clans, family & fun!"[:120])
+        await bot.set_my_short_description(
+            f"{n} — AI chat, adventures, gaming, social connections & many more! \n\n~ @SexyPiyush ❤️"[:120])
         await bot.set_my_description(
-            f"👋 Hi, I'm {n}! {brand.EMOJI}\n\n💎 Earn diamonds · ⚔️ duel friends · 🗝 dungeons · 🐾 pets · 🏰 clans\n"
-            "💍 marriage & 👨‍👩‍👧‍👦 family tree · 🎭 fun actions with GIFs · 🤖 AI chat in groups, replies in your language\n\nPress START to begin!")
+            f"{n} — Not your usual bot.\n\n"
+            "» AI, games, chaos, connections & endless possibilities.\n"
+            "» Explore. Compete. Connect. Create your own world.\n"
+            "» One bot. Infinite vibes.\n\n"
+            "Queries?? –  @SexyPiyush")
     except Exception:
         log.exception("could not set the bot description")
