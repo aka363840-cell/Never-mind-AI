@@ -64,7 +64,7 @@ def _keys() -> tuple[str, ...]:
 def get_settings() -> Settings:
     models = tuple(
         m.strip()
-        for m in os.getenv("GEMINI_MODELS", "gemini-3.6-flash,gemini-3.5-flash,gemini-3.1-flash-lite,gemini-flash-latest,gemini-flash-lite-latest").split(",")
+        for m in os.getenv("GEMINI_MODELS", "gemini-3.8-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3.1-flash-lite,gemini-flash-latest,gemini-flash-lite-latest").split(",")
         if m.strip()
     )
     return Settings(
