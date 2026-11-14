@@ -71,7 +71,7 @@ async def refresh_commands(bot: Bot) -> None:
     n = brand.name()
     try:
         await bot.set_my_short_description(
-            f"{n} — AI chat, adventures, gaming, social connections & many more! \n\n~ @SexyPiyush ❤️"[:120])
+            f"{n} — AI chat, adventures, gaming, social connections & many more ! \n\n~ @SexyPiyush ❤️"[:120])
         await bot.set_my_description(
             f"{n} — Not your usual bot.\n\n"
             "» AI, games, chaos, connections & endless possibilities.\n"
