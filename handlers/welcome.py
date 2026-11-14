@@ -1,9 +1,11 @@
 """Welcome / goodbye messages for groups (always on)."""
 from __future__ import annotations
 
+import logging
+
 from aiogram import Bot, F, Router
 from aiogram.filters import ChatMemberUpdatedFilter, JOIN_TRANSITION, LEAVE_TRANSITION
-from aiogram.types import ChatMemberUpdated, InlineKeyboardButton as B, Message
+from aiogram.types import ChatJoinRequest, ChatMemberUpdated, InlineKeyboardButton as B, Message
 
 from database.models import AppState
 from database.session import db
@@ -11,6 +13,9 @@ from services.kv import kv
 from keyboards.menus import kb
 from utils import brand, content, deck
 from utils.fmt import esc, mention
+from utils.telegram import safe_send
+
+log = logging.getLogger(__name__)
 
 router = Router()
 
@@ -123,3 +128,24 @@ async def added_to_group(ev: ChatMemberUpdated, bot: Bot):
         await bot.send_message(ev.chat.id, text, reply_markup=kb([[B(text=f"{brand.EMOJI} Open menu in DM", url=brand.link("start=menu"))]]))
     except Exception:
         pass
+
+
+JOIN_REQUEST_DM = (
+    "Your join request has been received! An admin or moderator will need to approve it before you can join.\n\n"
+    "In the meantime, feel free to /start the bot and explore!"
+)
+
+
+@router.chat_join_request()
+async def on_join_request(ev: ChatJoinRequest, bot: Bot) -> None:
+    """A user submitted a join request to a group we're in. Telegram grants a one-time private-messaging
+    privilege for this (Bot API 5.5+): we may DM the user via `ev.user_chat_id` for a short window after the
+    request, even if they never started the bot — but ONLY if the bot is a group admin with the
+    'can_invite_users' right. We never touch the request itself (no approve/decline): that stays with the
+    group's admins. Nothing here can crash the dispatcher; a failed DM is just logged, never raised."""
+    if not await kv.set_nx(f"jr:{ev.chat.id}:{ev.from_user.id}", 300):
+        return   # Telegram can redeliver the same update; don't double-DM for one request.
+    msg = await safe_send(bot, ev.user_chat_id, JOIN_REQUEST_DM)
+    if msg is None:
+        log.info("join-request DM to %s (chat %s) not delivered (blocked, no admin right, or window expired)",
+                  ev.from_user.id, ev.chat.id)
