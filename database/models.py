@@ -434,3 +434,342 @@ class LoveStreak(Base):
     last_day: Mapped[date | None] = mapped_column(Date, nullable=True)
     a_day: Mapped[date | None] = mapped_column(Date, nullable=True)
     b_day: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+
+# ------------------------------------------------------------------ Academy Life (standalone school sim)
+class AcademySeason(Base):
+    """One season = 7 real days (start_at .. end_at), shared by all players. status: active | ended."""
+    __tablename__ = "academy_seasons"
+    id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
+    number: Mapped[int] = mapped_column(Integer, unique=True)
+    start_at: Mapped[datetime] = mapped_column(TS)
+    end_at: Mapped[datetime] = mapped_column(TS)
+    theme: Mapped[str] = mapped_column(String(64), default="")
+    status: Mapped[str] = mapped_column(String(16), default="active", index=True)
+
+
+class AcademyStudent(Base):
+    """A player enrolled in one season. Energy is stored lazily: `energy` as of `energy_at` (regen is computed on read)."""
+    __tablename__ = "academy_students"
+    id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
+    season_id: Mapped[int] = mapped_column(ForeignKey("academy_seasons.id", ondelete="CASCADE"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    stream: Mapped[str] = mapped_column(String(16))
+    club: Mapped[str] = mapped_column(String(16))
+    knowledge: Mapped[int] = mapped_column(Integer, default=10)
+    charisma: Mapped[int] = mapped_column(Integer, default=10)
+    fitness: Mapped[int] = mapped_column(Integer, default=10)
+    creativity: Mapped[int] = mapped_column(Integer, default=10)
+    energy: Mapped[int] = mapped_column(Integer, default=100)
+    energy_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    late_join: Mapped[bool] = mapped_column(Boolean, default=False)
+    enrolled_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    __table_args__ = (UniqueConstraint("season_id", "user_id", name="uq_academy_student_season_user"),)
+
+
+class AcademyDaily(Base):
+    """Part 2: one row per student and season day (1..7) with the counters of that day. Used by Part 2 itself (limits, the
+    diamond cap, the study streak) and later by exams and awards. `attended` is 0/1. `diamonds` = diamonds earned today."""
+    __tablename__ = "academy_daily"
+    id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("academy_students.id", ondelete="CASCADE"))
+    day: Mapped[int] = mapped_column(Integer)
+    study_count: Mapped[int] = mapped_column(Integer, default=0)
+    attended: Mapped[int] = mapped_column(Integer, default=0)
+    hangouts: Mapped[int] = mapped_column(Integer, default=0)
+    club_count: Mapped[int] = mapped_column(Integer, default=0)
+    parttime_count: Mapped[int] = mapped_column(Integer, default=0)
+    energy_spent: Mapped[int] = mapped_column(Integer, default=0)
+    rest_count: Mapped[int] = mapped_column(Integer, default=0)
+    diamonds: Mapped[int] = mapped_column(Integer, default=0)
+    __table_args__ = (UniqueConstraint("student_id", "day", name="uq_academy_daily_student_day"),)
+
+
+class AcademyClubPoints(Base):
+    """Part 2: the season score of each club (all students of a club add to the same row). Key = (season_id, club)."""
+    __tablename__ = "academy_club_points"
+    season_id: Mapped[int] = mapped_column(ForeignKey("academy_seasons.id", ondelete="CASCADE"), primary_key=True)
+    club: Mapped[str] = mapped_column(String(16), primary_key=True)
+    points: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class AcademyExam(Base):
+    """Part 3: the window of one exam in one season (midterm = Day 4, finals = Day 6). Created lazily by services/academy_exams."""
+    __tablename__ = "academy_exams"
+    id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
+    season_id: Mapped[int] = mapped_column(ForeignKey("academy_seasons.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(16))                       # midterm | finals
+    opens_at: Mapped[datetime] = mapped_column(TS)
+    closes_at: Mapped[datetime] = mapped_column(TS)
+    __table_args__ = (UniqueConstraint("season_id", "kind", name="uq_academy_exam_season_kind"),)
+
+
+class AcademyAttempt(Base):
+    """Part 3: a student's ONE attempt at an exam. state: active | done (finished by the player) | expired (the window closed
+    first). `cards` = the drawn card keys in order (comma separated); `round_started_at` is set while a question is on screen
+    (the 25 s are checked against it) and NULL while the player is looking at a result."""
+    __tablename__ = "academy_attempts"
+    id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("academy_students.id", ondelete="CASCADE"), index=True)
+    exam_kind: Mapped[str] = mapped_column(String(16))
+    started_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(TS)
+    score: Mapped[float | None] = mapped_column(Float)
+    grade: Mapped[str | None] = mapped_column(String(3))
+    state: Mapped[str] = mapped_column(String(10), default="active", index=True)
+    cards: Mapped[str] = mapped_column(String(512), default="")
+    round_started_at: Mapped[datetime | None] = mapped_column(TS)
+    focus_used: Mapped[int] = mapped_column(Integer, default=0)
+    reward: Mapped[int] = mapped_column(Integer, default=0)
+    __table_args__ = (UniqueConstraint("student_id", "exam_kind", name="uq_academy_attempt_student_kind"),)
+
+
+class AcademyRound(Base):
+    """Part 3: one answered round of an attempt (n = 1..8). choice = button index as text, or 'timeout'."""
+    __tablename__ = "academy_rounds"
+    id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
+    attempt_id: Mapped[int] = mapped_column(ForeignKey("academy_attempts.id", ondelete="CASCADE"), index=True)
+    n: Mapped[int] = mapped_column(Integer)
+    card_key: Mapped[str] = mapped_column(String(40))
+    choice: Mapped[str] = mapped_column(String(10))
+    roll: Mapped[int] = mapped_column(Integer, default=0)
+    success: Mapped[bool] = mapped_column(Boolean, default=False)
+    points: Mapped[int] = mapped_column(Integer, default=0)
+    focused: Mapped[int] = mapped_column(Integer, default=0)
+    __table_args__ = (UniqueConstraint("attempt_id", "n", name="uq_academy_round_attempt_n"),)
+
+
+class AcademyChatMember(Base):
+    """Part 3: which players used an exam command in which group (for the group /classrank). One row per pair, written
+    once (insert-ignore) when a player uses /exam, /grades or /classrank in a group; never per message."""
+    __tablename__ = "academy_chat_members"
+    chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+
+
+# ---------------------------------------------------------------- Academy Life, Part 4: social (rivals, crushes, club battles, buddies)
+class AcademyRival(Base):
+    """Part 4: one row PER PLAYER and season (a pair = two mirrored rows). rival_id NULL = a bot rival (bot_name / bot_seed)."""
+    __tablename__ = "academy_rivals"
+    id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
+    season_id: Mapped[int] = mapped_column(ForeignKey("academy_seasons.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    rival_id: Mapped[int | None] = mapped_column(BigInteger)
+    bot_name: Mapped[str] = mapped_column(String(40), default="")
+    bot_seed: Mapped[int] = mapped_column(Integer, default=0)
+    notified: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    __table_args__ = (UniqueConstraint("season_id", "user_id", name="uq_academy_rival_season_user"),)
+
+
+class AcademyRivalDuel(Base):
+    """Part 4: ONE duel per rival pair and season. user_a = the smaller id of the pair (or the player of a bot duel), user_b NULL = bot.
+    state open | done; result a | b | tie (NULL while open); walkover = one side never played."""
+    __tablename__ = "academy_rival_duels"
+    id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
+    season_id: Mapped[int] = mapped_column(ForeignKey("academy_seasons.id", ondelete="CASCADE"), index=True)
+    user_a: Mapped[int] = mapped_column(BigInteger)
+    user_b: Mapped[int | None] = mapped_column(BigInteger)
+    cards: Mapped[str] = mapped_column(String(128), default="")
+    state: Mapped[str] = mapped_column(String(8), default="open", index=True)
+    result: Mapped[str | None] = mapped_column(String(8))
+    walkover: Mapped[bool] = mapped_column(Boolean, default=False)
+    chat_id: Mapped[int | None] = mapped_column(BigInteger)         # the group where it was started (for the ONE result announcement)
+    created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    closed_at: Mapped[datetime | None] = mapped_column(TS)
+    __table_args__ = (UniqueConstraint("season_id", "user_a", name="uq_academy_duel_season_a"),)
+
+
+class AcademyRivalRound(Base):
+    """Part 4: one played card of a duel. user_id 0 = the bot side."""
+    __tablename__ = "academy_rival_rounds"
+    id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
+    duel_id: Mapped[int] = mapped_column(ForeignKey("academy_rival_duels.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger)
+    n: Mapped[int] = mapped_column(Integer)
+    card_key: Mapped[str] = mapped_column(String(40))
+    choice: Mapped[int] = mapped_column(Integer, default=0)
+    roll: Mapped[int] = mapped_column(Integer, default=0)
+    success: Mapped[bool] = mapped_column(Boolean, default=False)
+    points: Mapped[int] = mapped_column(Integer, default=0)
+    __table_args__ = (UniqueConstraint("duel_id", "user_id", "n", name="uq_academy_duel_round"),)
+
+
+class AcademyBadge(Base):
+    """Part 4: season badges and badge points. kind = rival | club. One row per season, player and kind."""
+    __tablename__ = "academy_badges"
+    season_id: Mapped[int] = mapped_column(ForeignKey("academy_seasons.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), primary_key=True)
+    points: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class AcademyCrush(Base):
+    """Part 4: a SECRET crush. Private by design: nothing but the sender (and the mutual reveal) ever reads it. One active crush
+    per player and season (UNIQUE); /crushoff deletes the row; a mutual crush turns into a couple and both rows are deleted."""
+    __tablename__ = "academy_crushes"
+    id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
+    season_id: Mapped[int] = mapped_column(ForeignKey("academy_seasons.id", ondelete="CASCADE"), index=True)
+    from_user: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    to_user: Mapped[int] = mapped_column(BigInteger, index=True)
+    chat_id: Mapped[int | None] = mapped_column(BigInteger)         # group of the command, ONLY used for the mutual announcement
+    created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    __table_args__ = (UniqueConstraint("season_id", "from_user", name="uq_academy_crush_season_from"),)
+
+
+class AcademyCouple(Base):
+    """Part 4: a Campus Couple (user_a < user_b), created only by a mutual crush. Standalone: no link to the marriage tables."""
+    __tablename__ = "academy_couples"
+    id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
+    season_id: Mapped[int] = mapped_column(ForeignKey("academy_seasons.id", ondelete="CASCADE"), index=True)
+    user_a: Mapped[int] = mapped_column(BigInteger, index=True)
+    user_b: Mapped[int] = mapped_column(BigInteger, index=True)
+    points: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    __table_args__ = (UniqueConstraint("season_id", "user_a", "user_b", name="uq_academy_couple_pair"),)
+
+
+class AcademyCoupleDate(Base):
+    """Part 4: one /campusdate per couple and season day (the PRIMARY KEY is the once-a-day lock)."""
+    __tablename__ = "academy_couple_dates"
+    couple_id: Mapped[int] = mapped_column(ForeignKey("academy_couples.id", ondelete="CASCADE"), primary_key=True)
+    day: Mapped[int] = mapped_column(Integer, primary_key=True)
+    by_user: Mapped[int] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+
+
+class AcademyBattle(Base):
+    """Part 4: the club battle of a season (UNIQUE per season, opened by a tick on Day 3). state open | closed; winner = club key."""
+    __tablename__ = "academy_battles"
+    id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
+    season_id: Mapped[int] = mapped_column(ForeignKey("academy_seasons.id", ondelete="CASCADE"), unique=True)
+    card_key: Mapped[str] = mapped_column(String(40))
+    opens_at: Mapped[datetime] = mapped_column(TS)
+    closes_at: Mapped[datetime] = mapped_column(TS)
+    state: Mapped[str] = mapped_column(String(8), default="open", index=True)
+    winner: Mapped[str | None] = mapped_column(String(16))
+
+
+class AcademyBattlePlay(Base):
+    """Part 4: a member's ONE battle round (PRIMARY KEY = once per battle). points = play_round points (can be negative)."""
+    __tablename__ = "academy_battle_plays"
+    battle_id: Mapped[int] = mapped_column(ForeignKey("academy_battles.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    club: Mapped[str] = mapped_column(String(16))
+    choice: Mapped[int] = mapped_column(Integer, default=0)
+    roll: Mapped[int] = mapped_column(Integer, default=0)
+    success: Mapped[bool] = mapped_column(Boolean, default=False)
+    points: Mapped[int] = mapped_column(Integer, default=0)
+    played_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+
+
+class AcademyBuddy(Base):
+    """Part 4: a study-buddy request (state pending) or pair (state active). user_a = who asked, user_b = who must accept."""
+    __tablename__ = "academy_buddies"
+    id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
+    season_id: Mapped[int] = mapped_column(ForeignKey("academy_seasons.id", ondelete="CASCADE"), index=True)
+    user_a: Mapped[int] = mapped_column(BigInteger, index=True)
+    user_b: Mapped[int] = mapped_column(BigInteger, index=True)
+    state: Mapped[str] = mapped_column(String(8), default="pending")
+    chat_id: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    __table_args__ = (UniqueConstraint("season_id", "user_a", "user_b", name="uq_academy_buddy_pair"),)
+
+
+class AcademyBuddyBonus(Base):
+    """Part 4: the buddy study bonus was given to this player on this season day (PRIMARY KEY = once a day)."""
+    __tablename__ = "academy_buddy_bonus"
+    season_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    day: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+
+
+class AcademySocialRun(Base):
+    """Part 4: 'this one-off job already ran for this season' (kind = rivals). The PRIMARY KEY makes a tick idempotent."""
+    __tablename__ = "academy_social_runs"
+    season_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    kind: Mapped[str] = mapped_column(String(24), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+
+
+class AcademyAdventureRun(Base):
+    """Part 5: one adventure run of a student. `node` = where the story is now, `state_json` = flags / counters (see
+    services/academy_adventure_logic.py), `step` = how many buttons were pressed (the optimistic-lock token: a stale or
+    double press loses the UPDATE ... WHERE step = :step), `finished` + `ending`: an ending key, or 'expired' / 'quit' (no reward).
+    A run that has had no press for 30 minutes expires."""
+    __tablename__ = "academy_adventure_runs"
+    id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("academy_students.id", ondelete="CASCADE"), index=True)
+    adventure_key: Mapped[str] = mapped_column(String(32))
+    node: Mapped[str] = mapped_column(String(48))
+    state_json: Mapped[str] = mapped_column(Text, default="{}")
+    started_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    finished: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    ending: Mapped[str | None] = mapped_column(String(48))
+    step: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class AcademyAdventureTrophy(Base):
+    """Part 5: a title or item earned from an adventure ending. PRIMARY KEY = once per season, player and trophy."""
+    __tablename__ = "academy_adventure_trophies"
+    season_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    key: Mapped[str] = mapped_column(String(48), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(8))
+    name: Mapped[str] = mapped_column(String(64))
+    adventure_key: Mapped[str] = mapped_column(String(32))
+    earned_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+
+
+# ------------------------------------------------------------------ Academy Life, Part 6: reminders, recaps, graduation
+class AcademyNotifyLog(Base):
+    """Part 6: one row per message that was (or is being) sent. UNIQUE(kind, key, target_id) is the 'send once' lock: a sender
+    INSERTs the row first and only sends if the insert won, so a restart, a retry or two overlapping ticks never send twice.
+    target_id = chat id (groups) or user id (DMs); season_id is only for housekeeping."""
+    __tablename__ = "academy_notify_log"
+    id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
+    kind: Mapped[str] = mapped_column(String(24))
+    key: Mapped[str] = mapped_column(String(64))
+    season_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    target_id: Mapped[int] = mapped_column(BigInteger)
+    sent_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    __table_args__ = (UniqueConstraint("kind", "key", "target_id", name="uq_academy_notify"),)
+
+
+class AcademyUserPrefs(Base):
+    """Part 6: per-user notification settings. remind_on = /academyremind on|off (off = no unsolicited Academy DMs at all).
+    unreachable = the bot could not DM this user (blocked it / never started it); unreachable_at = when we noticed."""
+    __tablename__ = "academy_user_prefs"
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    remind_on: Mapped[bool] = mapped_column(Boolean, default=True)
+    unreachable: Mapped[bool] = mapped_column(Boolean, default=False)
+    unreachable_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+
+
+class AcademyGroupSeen(Base):
+    """Part 6: when the bot last saw a message in a group (written at most every 6 hours per group by services/academy_seen.py,
+    NEVER per message). fails = how many Academy messages in a row the group refused (reset when someone writes there)."""
+    __tablename__ = "academy_group_seen"
+    chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    last_seen: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    fails: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class AcademyHallOfFame(Base):
+    """Part 6: every title awarded at a graduation ceremony (valedictorian, topper, backbencher, perfect_attendance, club_champion).
+    UNIQUE(season_id, user_id, title) = awarded once. name is copied at award time. detail = stream / club key where it applies.
+    season_id and user_id are plain integers (no FK). A staff /academyreset deletes the hall with everything else."""
+    __tablename__ = "academy_hall_of_fame"
+    id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
+    season_id: Mapped[int] = mapped_column(Integer, index=True)
+    season_number: Mapped[int] = mapped_column(Integer, index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    name: Mapped[str] = mapped_column(String(128), default="Player")
+    title: Mapped[str] = mapped_column(String(24))
+    rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    gpa: Mapped[float | None] = mapped_column(Float, nullable=True)
+    detail: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    __table_args__ = (UniqueConstraint("season_id", "user_id", "title", name="uq_academy_hof"),)

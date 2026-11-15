@@ -68,20 +68,27 @@ async def housekeeping_loop() -> None:
 
 
 def build_dispatcher(ai=None) -> Dispatcher:
-    from handlers import admin, ai_chat, casino, clan, combat, economy, events as events_h, fun, pets as pets_h, rank, shop as shop_h, start, welcome, extras as extras_h, life as life_h, realm as realm_h, family as family_h, arcade as arcade_h, romance as romance_h
+    from handlers import admin, ai_chat, casino, clan, combat, economy, events as events_h, fun, pets as pets_h, rank, shop as shop_h, start, welcome, extras as extras_h, life as life_h, realm as realm_h, family as family_h, arcade as arcade_h, romance as romance_h, academy_routers
     dp = Dispatcher()
     dp.workflow_data["ai"] = ai
+    from services.academy_seen import GroupSeenMiddleware      # Academy Part 6: notes group activity (one write per group per 6 h)
+    dp.update.outer_middleware(GroupSeenMiddleware())
     for obs in (dp.message, dp.callback_query):          # ErrorMiddleware first => outermost
         obs.middleware(ErrorMiddleware())
         obs.middleware(CoreMiddleware())
     # order matters: admin & game routers first, free-form AI chat last
-    for r in (admin.router, start.router, economy.router, casino.router, clan.router, pets_h.router, events_h.router, realm_h.router, fun.router, combat.router, shop_h.router, rank.router, welcome.router, extras_h.router, life_h.router, family_h.router, arcade_h.router, romance_h.router, ai_chat.router):
+    for r in (admin.router, start.router, economy.router, casino.router, clan.router, pets_h.router, events_h.router, realm_h.router, fun.router, combat.router, shop_h.router, rank.router, welcome.router, extras_h.router, life_h.router, family_h.router, arcade_h.router, romance_h.router, *academy_routers.routers(), ai_chat.router):
         dp.include_router(r)
     return dp
 
 
 async def romance_loop(bot: Bot) -> None:
     from handlers.romance import romance_loop as _loop
+    await _loop(bot)
+
+
+async def academy_loop(bot: Bot) -> None:
+    from services.academy_ticks import academy_loop as _loop
     await _loop(bot)
 
 
@@ -183,7 +190,7 @@ async def main() -> None:
     tasks = [asyncio.create_task(brand_loop(bot)), asyncio.create_task(maintenance_loop(bot)), asyncio.create_task(events.events_loop(bot)),
              asyncio.create_task(announce.levelup_loop(bot)),
              asyncio.create_task(realm_loop(bot)), asyncio.create_task(housekeeping_loop()),
-             asyncio.create_task(romance_loop(bot))]
+             asyncio.create_task(romance_loop(bot)), asyncio.create_task(academy_loop(bot))]
     if ai is not None:
         tasks.append(asyncio.create_task(_ai_selftest()))
     try:

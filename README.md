@@ -203,6 +203,14 @@ Tuning constants are at the top of `services/arcade.py` (`SCRATCH_TABLE`, `RPS_W
 Tests: `pytest tests/test_arcade.py tests/test_arcade_flow.py` (the second one drives the real Dispatcher with a fake Telegram transport).
 The `/` menu shows `/arcade`, `/scratch` and `/ttt` (Telegram limits a menu to 100 commands); every other command works the same and is listed in `/arcade` and `/help`.
 
+## 🎓 Academy Life (school sim)
+
+A standalone school/college game: one season = 7 real days shared by everyone, then a short break. Enroll, pick a stream and a club, study,
+sit game-style exams (strategy rounds, no school questions), go on adventures, battle for your club and graduate. Players start with
+`/enroll` and read `/academyhelp`; all commands are listed in `/help` under "Academy 🎓" (they are not in Telegram's "/" menu).
+Optional env vars: `ACADEMY_ENABLED`, `ACADEMY_TZ` (default Asia/Kolkata), `ACADEMY_BREAK_HOURS`, `ACADEMY_DAILY_HOUR`,
+`ACADEMY_GRADUATION_DIAMONDS`. New tables are created automatically. Full documentation: [docs/ACADEMY.md](docs/ACADEMY.md).
+
 ## Tests
 ```bash
 pytest                                   # SQLite

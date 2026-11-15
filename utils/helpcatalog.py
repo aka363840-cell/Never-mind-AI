@@ -11,13 +11,14 @@ from __future__ import annotations
 
 import html
 
+from game import academy_rules as AR
 from game.rules import R
 
 # Commands for the owner / moderators. Never listed in the menu or in /help.
 STAFF = frozenset({
     "admin", "stats", "backup", "backupdb", "restoredb", "give", "take", "setbalance", "ban", "unban", "mute",
     "unmute", "userinfo", "logs", "maintenance", "broadcast", "emojiid", "seticon", "delicon", "aitest", "drop",
-    "boss", "purgeadopted",
+    "boss", "purgeadopted", "academyadvance", "academyreset",
 })
 
 # The "/" menu: only the commands players use all the time (everything else is in /help).
@@ -138,6 +139,31 @@ DESC_LIST: list[tuple[str, str]] = [
     ('gifts', '🎁 List gifts for your partner'),
     ('disown', '💔 Remove a child from your family'),
     ('settings', '⚙️ Group settings (group admins)'),
+    ('enroll', '📝 Join the Academy this season (stream & club)'),
+    ('academy', '🎓 Your Academy dashboard: stats, Energy, today'),
+    ('schedule', '📅 Academy week: today, countdown & full timetable'),
+    ('study', f'📚 Study: raises Knowledge and builds a daily streak (⚡{AR.ACTIONS["study"].energy} Energy)'),
+    ('attend', f'🏫 Attend class on class days: Knowledge and an attendance mark (⚡{AR.ACTIONS["attend"].energy} Energy)'),
+    ('hangout', f'🎈 Hang out with friends: raises Charisma (⚡{AR.ACTIONS["hangout"].energy} Energy)'),
+    ('rest', '😴 Rest: get some Energy back (free, limited per day)'),
+    ('club', f'🎯 Club practice: points for your club and a stat boost (⚡{AR.ACTIONS["club"].energy} Energy)'),
+    ('parttime', f'💼 Part-time job: a few diamonds, with a daily cap (⚡{AR.ACTIONS["parttime"].energy} Energy)'),
+    ('exam', f'📝 Sit the Midterm (Day 4) or Finals (Day 6): strategy rounds, {AR.ROUND_SECONDS}s each'),
+    ('grades', '📊 Your exam results, GPA and grade'),
+    ('classrank', '🏅 Academy class rank: top 10 and your place (group or global)'),
+    ('rival', '🤝 Your Academy rival (paired on Day 3) and Rival badge points'),
+    ('rivalduel', f'⚔️ Duel your rival: {AR.RIVAL_DUEL_ROUNDS} scenario cards, winner gets {AR.RIVAL_WIN_DIAMONDS} 💎 (⚡{AR.RIVAL_DUEL_ENERGY} Energy)'),
+    ('crush', '🤫 Secret crush (reply/@user): only revealed if it is mutual. Best used in a private chat'),
+    ('crushoff', '🗑 Remove your secret crush'),
+    ('campuscouple', '💞 Your Campus Couple status and points'),
+    ('campusdate', f'🍿 Campus date once a day (⚡{AR.DATE_ENERGY} Energy + {AR.DATE_DIAMONDS} 💎): stat boost and couple points'),
+    ('clubs', '🏟 Club standings and the club battle (/clubs play)'),
+    ('buddy', f'📚 Study buddy (/buddy @user, /buddy off): +{AR.BUDDY_KNOWLEDGE_BONUS} Knowledge on your first /study each day'),
+    ('adventure', f'🗺 Academy adventures from Day {AR.ADV_FIRST_DAY}: story choices, stat checks, rewards (max {AR.ADV_MAX_PER_DAY} a day, Fest Day bonus)'),
+    ('academyremind', '🔔 Academy reminders and recaps by DM: /academyremind on or off (at most one reminder a day, quiet at night)'),
+    ('reportcard', '📜 Your Academy report card: GPA, grade, rank, titles, badges (/reportcard last = previous season)'),
+    ('halloffame', '🏛 Academy Hall of Fame: valedictorians, toppers and club champions of past seasons'),
+    ('academyhelp', '❓ Academy guide: getting started, daily life, exams & grades, adventures, social, the week, privacy (e.g. /academyhelp week)'),
 ]
 DESC: dict[str, str] = dict(DESC_LIST)
 
@@ -146,6 +172,7 @@ ALIASES: dict[str, tuple[str, ...]] = {
     '8ball': ('ask8',),
     'about': ('info',),
     'rules': ('rule', 'guide'),
+    'academy': ('school',),
     'achievements': ('badges', 'ach'),
     'actions': ('fun',),
     'addfamily': ('relate', 'addrelative'),
@@ -183,6 +210,7 @@ ALIASES: dict[str, tuple[str, ...]] = {
     'roles': ('familyroles',),
     'roll': ('dice',),
     'rps': ('rockpaperscissors',),
+    'schedule': ('timetable',),
     'scratch': ('scratchcard',),
     'slots': ('slot',),
     'spin': ('wheel',),
@@ -272,6 +300,8 @@ CATEGORIES: list[tuple[str, list[str]]] = [
                           "father", "mother", "brother", "sister", "@roles"]),
     ("🎭 Social & Fun", ["actions", "hug", "slap", "kiss", "compliment", "roast", "truth", "dare", "joke", "fact", "horoscope",
                          "fortune", "iq", "lucky", "rate", "@actions"]),
+    ("Academy 🎓", ["enroll", "academy", "schedule", "study", "attend", "hangout", "rest", "club", "parttime", "exam", "grades", "classrank",
+                      "rival", "rivalduel", "crush", "crushoff", "campuscouple", "campusdate", "clubs", "buddy", "adventure", "academyremind", "reportcard", "halloffame", "academyhelp"]),
     ("🤖 AI Chat", ["ask"]),
 ]
 OTHER = "📦 Other"
