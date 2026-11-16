@@ -241,7 +241,14 @@ def rules(topic: str | None = None) -> tuple[str, InlineKeyboardMarkup]:
 
 def family_help() -> tuple[str, InlineKeyboardMarkup]:
     return (f"{brand.line()}\n👨‍👩‍👧‍👦 <b>Love &amp; Family</b>\n{DIV}\n"
-            "💍 /marry <i>(reply)</i> · /couple · /divorce\n💑 /date · 🎁 /gift · 👶 /baby · 🧸 /adopt\n\n"
+            "💍 <b>Getting married</b>\n/marry <i>(reply)</i> — propose · /engage <i>(reply)</i> — get engaged first, /engage break to call it off\n"
+            "/wedding — plan the venue, card &amp; gift · /couple — your marriage · /divorce — end it\n\n"
+            "💞 <b>Keeping it alive</b>\n/date — go on a date · /gift /gifts — gift your partner (flowers, chocolate, teddy, cake…)\n"
+            "/sendgift — the full gift shop · /loveletter — send a styled love letter (max 300 chars)\n"
+            "/anniversary — days together, milestones &amp; yearly bonus · /honeymoon — a 6h trip after your wedding\n"
+            "/couplequest — two shared daily tasks · /lovestreak — daily check-in streak (rewards at 7/30/100 days)\n"
+            "/ship — love calculator 💘\n\n"
+            "👶 <b>Kids</b>\n/baby — have one · /adopt <i>(reply)</i> — adopt someone · /disown — remove a child\n\n"
             "🌳 <b>Family tree</b>\n/family — see yours (or reply to see theirs)\n/familytree — a picture of the tree, family only (no friends)\n"
             "Reply to someone with <code>/addfamily brother</code> or just <code>/father</code> <code>/mother</code> <code>/brother</code> <code>/friend</code> …\n"
             f"They must accept 💞 · /roles shows all {len(family.ROLES)} roles\n/unfamily — remove a relation\n/gender — label relatives correctly\n\n"
@@ -546,6 +553,7 @@ def realm_help() -> tuple[str, InlineKeyboardMarkup]:
 def casino_help() -> tuple[str, InlineKeyboardMarkup]:
     return (f"{brand.line()}\n\n🎰 <b>Casino &amp; Luck</b>\n\n/spin — free lucky wheel every {R.spin_cooldown_s // 3600}h (jackpot up to 5,000 💎)\n"
             f"/slots <i>bet</i> — match 3 symbols, up to x77!\n/flip <i>bet [heads|tails]</i> — double or nothing\n"
+            "/scratch — scratch card, match 3 to win up to 3,000 💎\n"
             f"/daily — keep your 🔥 streak alive for bonus diamonds\n\n<i>Bets: {R.casino_min_bet}–{R.casino_max_bet:,} 💎. Play responsibly — it's only a game!</i>"), kb([back()])
 
 
