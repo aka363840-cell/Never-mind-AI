@@ -211,11 +211,12 @@ async def prepare(m: Message, command: CommandObject | None, bot: Bot, *, right:
 
 
 def split_duration(args: list[str]) -> tuple[int | None, str]:
-    """['1h', 'spam', 'links'] -> (3600, 'spam links'); ['spam'] -> (None, 'spam')"""
-    if args:
-        d = parse_duration(args[0])
+    """The duration can be anywhere in the args, not just first: ['1h', 'spam', 'links'] -> (3600, 'spam links');
+    ['spam', '1h', 'links'] -> (3600, 'spam links') too; ['spam'] -> (None, 'spam')."""
+    for i, tok in enumerate(args):
+        d = parse_duration(tok)
         if d is not None:
-            return d, " ".join(args[1:])[:300]
+            return d, " ".join(args[:i] + args[i + 1:])[:300]
     return None, " ".join(args)[:300]
 
 
