@@ -19,6 +19,7 @@ STAFF = frozenset({
     "admin", "stats", "backup", "backupdb", "restoredb", "give", "take", "setbalance", "ban", "unban", "mute",
     "unmute", "userinfo", "logs", "maintenance", "broadcast", "emojiid", "seticon", "delicon", "aitest", "drop",
     "boss", "purgeadopted", "academyadvance", "academyreset",
+    "gameban", "gameunban", "gamemute", "gameunmute", "botban", "botunban", "botmute", "botunmute",
 })
 
 # The "/" menu: only the commands players use all the time (everything else is in /help).

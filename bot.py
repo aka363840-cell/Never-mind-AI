@@ -76,8 +76,25 @@ def build_dispatcher(ai=None) -> Dispatcher:
     for obs in (dp.message, dp.callback_query):          # ErrorMiddleware first => outermost
         obs.middleware(ErrorMiddleware())
         obs.middleware(CoreMiddleware())
+    mod_head = mod_tail = None                       # moderation: separate module; if it fails to load the bot simply runs without it
+    try:
+        import moderation
+        mod_head, mod_tail = moderation.install(dp)
+
+        async def _flair(message, name: str) -> None:            # moderation actions get the game's reaction GIF, when one exists
+            from utils import gifs
+            key = {"mute": "bonk", "ban": "yeet"}.get(name, name)
+            if key in gifs.GIF_ACTIONS:
+                await gifs.bonus(message, key)
+        moderation.set_flair_provider(_flair)
+    except Exception:
+        log.exception("moderation module failed to load - continuing without it")
     # order matters: admin & game routers first, free-form AI chat last
-    for r in (admin.router, start.router, economy.router, casino.router, clan.router, pets_h.router, events_h.router, realm_h.router, fun.router, combat.router, shop_h.router, rank.router, welcome.router, extras_h.router, life_h.router, family_h.router, arcade_h.router, romance_h.router, *academy_routers.routers(), ai_chat.router):
+    routers = [admin.router, start.router, economy.router, casino.router, clan.router, pets_h.router, events_h.router, realm_h.router, fun.router, combat.router, shop_h.router, rank.router, welcome.router, extras_h.router, life_h.router, family_h.router, arcade_h.router, romance_h.router, *academy_routers.routers(), ai_chat.router]
+    if mod_head is not None:
+        routers.insert(0, mod_head)                  # group moderation commands win over same-named game commands (groups only)
+        routers.insert(routers.index(ai_chat.router), mod_tail)     # AI-isolation guard sits right before the AI chat
+    for r in routers:
         dp.include_router(r)
     return dp
 
@@ -148,6 +165,11 @@ async def main() -> None:
         raise SystemExit("BOT_TOKEN and OWNER_ID must be set (see .env.example)")
     db.init(st.database_url)
     await db.create_all()          # idempotent: only creates tables that don't exist yet (clans, pets, ...)
+    try:
+        from moderation import store as _mod_store
+        await _mod_store.init_schema()                # own mod_* tables, additive migrations
+    except Exception:
+        log.exception("moderation schema init failed (moderation features degraded; everything else is unaffected)")
     init_kv(st.redis_url)
     from keyboards import style as btn_style
     try:
@@ -193,6 +215,11 @@ async def main() -> None:
              asyncio.create_task(romance_loop(bot)), asyncio.create_task(academy_loop(bot))]
     if ai is not None:
         tasks.append(asyncio.create_task(_ai_selftest()))
+    try:
+        import moderation
+        tasks.append(asyncio.create_task(moderation.run(bot)))     # temp-punishment scheduler & moderation housekeeping
+    except Exception:
+        log.exception("could not start the moderation scheduler")
     try:
         from services import users
         async with db.tx() as s:                                  # remembered in the DB -> part of every backup

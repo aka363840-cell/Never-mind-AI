@@ -77,10 +77,21 @@ class ErrorMiddleware(BaseMiddleware):
                 pass
 
 
+def _is_mod_handler(data: dict) -> bool:
+    """Handlers registered by the moderation module carry flags={'moderation': True} (belt and braces next to data['mod_ns'])."""
+    try:
+        from aiogram.dispatcher.flags import get_flag
+        return bool(get_flag(data, "moderation"))
+    except Exception:
+        return False
+
+
 class CoreMiddleware(BaseMiddleware):
     """Throttling, callback-replay guard, auto-registration, ban/mute/maintenance, group settings."""
 
     async def __call__(self, handler: Callable, event: TelegramObject, data: dict[str, Any]) -> Any:
+        if data.get("mod_ns") or _is_mod_handler(data):                      # moderation module handlers: fully separate from game gating (see moderation/base.py)
+            return await handler(event, data)
         tg = data.get("event_from_user")
         if tg is None or tg.is_bot:
             return await handler(event, data)

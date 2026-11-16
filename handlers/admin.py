@@ -138,10 +138,10 @@ async def _moderate(m: Message, action: str, target: int, rest: list[str]):
         await m.reply(await adm.execute(m.from_user.id, action, args))
 
 
-@router.message(Command("ban", "unban", "mute", "unmute"))
+@router.message(Command("ban", "unban", "mute", "unmute", "gameban", "gameunban", "gamemute", "gameunmute", "botban", "botunban", "botmute", "botunmute"))
 async def moderation_cmds(m: Message, command: CommandObject):
     target, rest = await _target_and_args(m, command)
-    await _moderate(m, command.command.lower(), target, rest)
+    await _moderate(m, command.command.lower().removeprefix("game").removeprefix("bot"), target, rest)
 
 
 # Plain-text moderation (no slash): reply to someone (or add @user / ID) and write "ban", "ban karo", "isko mute kardo", "unban"...

@@ -36,8 +36,15 @@ WELCOME += content.WELCOME_MORE
 GOODBYE += content.GOODBYE_MORE
 
 
-async def welcome_on(chat_id: int) -> bool:
-    """Welcome / goodbye messages are ALWAYS on (no switch any more; an old 'off' flag in the DB is ignored)."""
+async def welcome_on(chat_id: int, kind: str = "join") -> bool:
+    """Welcome / goodbye messages are ALWAYS on (no switch any more; an old 'off' flag in the DB is ignored).
+    The only exception: a group that configured its OWN welcome / goodbye with the moderation module (it sends that instead)."""
+    try:
+        from moderation import legacy_welcome_suppressed
+        if await legacy_welcome_suppressed(chat_id, kind):
+            return False
+    except Exception:
+        pass                                          # moderation missing / broken -> behave exactly as before
     return True
 
 
@@ -81,7 +88,7 @@ async def on_join(m: Message, bot: Bot):
 @router.message(F.left_chat_member)
 async def on_leave(m: Message, bot: Bot):
     u = m.left_chat_member
-    if u.is_bot or not await welcome_on(m.chat.id) or not await _once("l", m.chat.id, u.id):
+    if u.is_bot or not await welcome_on(m.chat.id, "leave") or not await _once("l", m.chat.id, u.id):
         return
     await _announce_leave(bot, m.chat, u)
 
@@ -99,7 +106,7 @@ async def cm_join(ev: ChatMemberUpdated, bot: Bot):
 @router.chat_member(ChatMemberUpdatedFilter(member_status_changed=LEAVE_TRANSITION))
 async def cm_leave(ev: ChatMemberUpdated, bot: Bot):
     u = ev.new_chat_member.user
-    if ev.chat.type not in ("group", "supergroup") or u.is_bot or not await welcome_on(ev.chat.id):
+    if ev.chat.type not in ("group", "supergroup") or u.is_bot or not await welcome_on(ev.chat.id, "leave"):
         return
     if await _once("l", ev.chat.id, u.id):
         await _announce_leave(bot, ev.chat, u)

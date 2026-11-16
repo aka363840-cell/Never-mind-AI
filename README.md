@@ -211,6 +211,13 @@ sit game-style exams (strategy rounds, no school questions), go on adventures, b
 Optional env vars: `ACADEMY_ENABLED`, `ACADEMY_TZ` (default Asia/Kolkata), `ACADEMY_BREAK_HOURS`, `ACADEMY_DAILY_HOUR`,
 `ACADEMY_GRADUATION_DIAMONDS`. New tables are created automatically. Full documentation: [docs/ACADEMY.md](docs/ACADEMY.md).
 
+## 🛡 Moderation framework
+
+A self-contained group-moderation module (`moderation/`) with no game/economy/AI/social coupling: warnings, mutes/bans/kicks, anti-flood/anti-spam
+guards, lockdown, bulk actions and a settings dashboard, all opt-in per group (everything defaults OFF until a group admin turns it on).
+It loads independently at startup — if it fails to import, the rest of the bot runs exactly as before, just without moderation commands.
+Full documentation: [docs/MODERATION.md](docs/MODERATION.md).
+
 ## Tests
 ```bash
 pytest                                   # SQLite
