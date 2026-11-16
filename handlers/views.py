@@ -556,6 +556,28 @@ def fun_help() -> tuple[str, InlineKeyboardMarkup]:
             f"/ask <i>anything</i> — talk to {brand.name()} {brand.EMOJI} (or just say my name in a group!)"), kb([back()])
 
 
+async def academy_help(uid: int) -> tuple[str, InlineKeyboardMarkup]:
+    """Academy Life overview, reached from the main menu. Reuses the real Academy dashboard's own buttons
+    (Enroll now / Schedule / Refresh - the same ones /academy gives you) so this isn't a dead end: tapping
+    them keeps you inside the Academy's own click-through flow, same as tapping into Realm or Arcade."""
+    from handlers.academy_core import _dash_kb, _load
+    from services import academy_calendar as acal
+    season, st, now = await _load(uid)
+    win = acal.enroll_window(season.start_at, now)
+    rows = list(_dash_kb(uid, st is not None, win.open).inline_keyboard) + [back()]
+    text = (f"{brand.line()}\n\n🎓 <b>Academy Life</b>\n\n"
+            "A 7-day shared school season: enroll, pick a stream &amp; club, then live the week.\n\n"
+            "/enroll · /academy — join &amp; your dashboard\n/schedule — this week's timetable\n"
+            "/study /attend /hangout /club /parttime /rest — daily actions\n"
+            "/exam — Midterm (Day 4) &amp; Finals (Day 6) · /grades /classrank\n"
+            "/rival /rivalduel — your paired rival · /buddy — study partner bonus\n"
+            "/crush /campuscouple /campusdate — campus romance\n"
+            "/clubs — standings &amp; club battle · /adventure — story adventures\n"
+            "/reportcard /halloffame — season results, past &amp; present\n"
+            "/academyremind — optional DM reminders · /academyhelp — the full guide")
+    return text, kb(rows)
+
+
 def ai_info() -> tuple[str, InlineKeyboardMarkup]:
     return (f"{brand.line()}\n\n🤖 <b>Chat with {esc(brand.name())}</b>\n\nAI chat works in <b>groups</b>: tag me, reply to my message or say my name, in any language — I reply in the language you use. "
             "If you chat too fast I take a 2-minute break.\n\n"

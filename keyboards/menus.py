@@ -17,6 +17,7 @@ def main_menu() -> M:
         [B(text="🎯 Missions", callback_data="nav:missions"), B(text="🏆 Rankings", callback_data="lb:rich:0")],
         [B(text="🏰 Clan", callback_data="nav:clan"), B(text="🐾 Pets & Hunt", callback_data="nav:pet")],
         [B(text="🗺 Realm: Dungeon & Heists", callback_data="nav:realm")],
+        [B(text="🎓 Academy Life", callback_data="nav:academy")],
         [B(text="👨‍👩‍👧‍👦 Love & Family", callback_data="nav:family"), B(text="🎉 Fun", callback_data="nav:fun")],
         [B(text="🎰 Casino", callback_data="nav:casino"), B(text="🤖 AI Chat", callback_data="nav:ai")],
         [B(text="🕹 Arcade & Social", callback_data="nav:arcade")],

@@ -44,6 +44,8 @@ async def render(name: str, user: User):
     if name == "arcade":
         from handlers import arcade as arcade_page
         return await arcade_page.hub(user.id)
+    if name == "academy":
+        return await views.academy_help(user.id)
     raise GameError("❌ Unknown page.")
 
 
