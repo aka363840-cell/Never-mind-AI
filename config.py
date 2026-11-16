@@ -34,6 +34,7 @@ def _db_url(url: str) -> str:
 class Settings:
     bot_token: str
     owner_id: int
+    developer_username: str
     admin_ids: frozenset[int]
     bot_names: tuple[str, ...]
     database_url: str
@@ -70,6 +71,7 @@ def get_settings() -> Settings:
     return Settings(
         bot_token=os.getenv("BOT_TOKEN", ""),
         owner_id=_int("OWNER_ID", 0),
+        developer_username=os.getenv("DEVELOPER_USERNAME", "").lstrip("@").strip(),
         admin_ids=_ids("ADMIN_IDS"),
         bot_names=tuple(n.strip() for n in os.getenv("BOT_NAMES", "").split(",") if n.strip()),
         database_url=_db_url(os.getenv("DATABASE_URL", "sqlite+aiosqlite:///bot.db")),

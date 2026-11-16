@@ -95,31 +95,82 @@ async def rules_cmd(m: Message, command: CommandObject):
 async def rules_cb(cb: CallbackQuery):
     topic = cb.data.split(":", 1)[1]
     text, markup = views.rules(None if topic == "home" else topic)
-    await safe_edit(cb, text, markup)
+    await safe_edit(cb, text, _with_back(markup, cb))
     await safe_answer(cb)
+
+
+_contact_cache: dict[int, str] = {}
+
+
+async def _owner_url(bot: Bot, uid: int) -> str:
+    """Prefer a public t.me/<username> link (tg://user links can be rejected by Telegram privacy settings)."""
+    if uid in _contact_cache:
+        return _contact_cache[uid]
+    url = f"tg://user?id={uid}"
+    try:
+        chat = await bot.get_chat(uid)
+        if chat.username:
+            url = f"https://t.me/{chat.username}"
+    except Exception:
+        pass
+    _contact_cache[uid] = url
+    return url
+
+
+async def _contacts(bot: Bot) -> list[tuple[str, str]]:
+    from config import get_settings
+    st = get_settings()
+    out = []
+    if st.owner_id:
+        out.append(("👑 Owner", await _owner_url(bot, st.owner_id)))
+    if st.developer_username:
+        out.append(("💻 Developer", f"https://t.me/{st.developer_username}"))
+    return out
+
+
+async def _send_start(m: Message, bot: Bot, first_name: str, group: bool) -> None:
+    text, markup = await views.welcome(first_name, group, None if group else await _contacts(bot))
+    if not await _intro_video(m, text, markup):               # video + short caption in ONE message
+        await m.answer(text, reply_markup=markup)             # no video available: plain text
 
 
 @router.message(Command("start", "menu"))
 async def start(m: Message, command: CommandObject, bot: Bot, db_user: User):
-    if m.chat.type != "private":
-        await m.reply(f"{brand.line()}\nUse commands here (/daily /kill /duel /family /hug …) or open the full menu in private 👇",
-                      reply_markup=kb([[B(text=f"Open {brand.name()} menu", url=brand.link("start=menu"))]]))
-        return
+    group = m.chat.type != "private"
     payload = (command.args or "").strip().lower()
-    if payload in ("about", "help"):
+    if not group and payload in ("about", "help"):
         text, markup = await views.about() if payload == "about" else views.command_guide()
         await m.answer(text, reply_markup=markup)
         return
-    if m.text and m.text.lstrip().lower().startswith("/start"):
+    if m.text and m.text.lstrip().lower().startswith(("/start", "/menu")) or group:
         try:
-            text, markup = await views.welcome(db_user.first_name)
-            if not await _intro_video(m, text, markup):               # video + short caption in ONE message
-                await m.answer(text, reply_markup=markup)             # no video available: plain text
+            await _send_start(m, bot, db_user.first_name, group)
             return
         except Exception:                                            # /start must never fail: fall back to the plain menu
             log.exception("welcome screen failed")
     text, markup = await views.main(db_user.first_name)
     await m.answer(text, reply_markup=markup)
+
+
+@router.callback_query(F.data == "gc:home")
+async def group_home(cb: CallbackQuery, bot: Bot, db_user: User):
+    """Back to the start card (video + description) from any hub page in a group."""
+    msg = cb.message
+    try:
+        await msg.delete()
+    except Exception:
+        pass
+    await _send_start(msg, bot, db_user.first_name, True)
+    await safe_answer(cb)
+
+
+def _with_back(markup: InlineKeyboardMarkup | None, cb: CallbackQuery) -> InlineKeyboardMarkup | None:
+    """In groups every hub page gets a Back button to the start card."""
+    if cb.message is None or cb.message.chat.type == "private":
+        return markup
+    rows = [list(r) for r in (markup.inline_keyboard if markup else [])]
+    rows.append([B(text="⬅️ Back to Start", callback_data="gc:home")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 @router.message(Command("help"))
@@ -136,7 +187,7 @@ async def help_page(cb: CallbackQuery):
     if part[0].startswith("c"):
         cat, page = int(part[0][1:]), int(part[1]) if len(part) > 1 else 0
     text, markup = views.command_guide(cat, compact=in_group, page=page or 0)
-    await safe_edit(cb, text, markup)
+    await safe_edit(cb, text, _with_back(markup, cb))
     await safe_answer(cb)
 
 
@@ -149,7 +200,7 @@ async def about_cmd(m: Message):
 @router.callback_query(F.data.startswith("nav:"))
 async def nav(cb: CallbackQuery, db_user: User):
     text, markup = await render(cb.data.split(":")[1], db_user)
-    await safe_edit(cb, text, markup)
+    await safe_edit(cb, text, _with_back(markup, cb))
     await safe_answer(cb)
 
 

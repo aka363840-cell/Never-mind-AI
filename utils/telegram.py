@@ -31,6 +31,11 @@ async def safe_edit(cb: CallbackQuery, text: str, kb: InlineKeyboardMarkup | Non
         if "not modified" in str(e).lower():
             return
         try:
+            if "no text in the message" in str(e).lower():     # media (video) message: swap it for the page, no leftover
+                try:
+                    await cb.message.delete()
+                except Exception:
+                    pass
             await cb.message.answer(text, reply_markup=kb)
         except Exception:
             log.debug("edit fallback failed", exc_info=True)

@@ -28,24 +28,33 @@ async def main(first_name: str) -> tuple[str, InlineKeyboardMarkup]:
     return (f"{brand.line()}\n{DIV}\n✨ Hey <b>{esc(first_name)}</b>!\nWhat shall we do today?\n{DIV}\n<i>Pick an option below 👇</i>"), main_menu()
 
 
-async def welcome(first_name: str) -> tuple[str, InlineKeyboardMarkup]:
-    """Every /start in DM (not just the first ever): intro video + greeting + about + quick start."""
-    text = (f"💖 <b>Welcome, {esc(first_name)}!</b>\n"
-            f"I'm <b>{esc(brand.name())}</b> — your game, family &amp; fun companion.\n\n"
-            "💎 Earn — /daily /work /fish /mine\n"
-            "⚔️ Fight &amp; duel · 🐾 Pets · 🏰 Clans\n"
-            "💍 Marry &amp; build a family · 🎭 /hug /kiss /pat\n"
-            "🎓 Academy — /enroll · 🛡 Moderation — /modhelp\n"
-            "🤖 AI chat in groups — just tag me\n\n"
-            "🎁 Start with /daily · 👥 Add me to your group!")
-    return text, welcome_kb()
+async def welcome(first_name: str, group: bool = False, contacts: list[tuple[str, str]] | None = None) -> tuple[str, InlineKeyboardMarkup]:
+    """/start card (sent as the caption of the intro video). DM: add-to-group + owner buttons.
+    Group: three hub buttons that open everything in the same message."""
+    line = "━━━━━━━━━━━━━━━━"
+    n = esc(brand.name())
+    text = (f"{banner()}\n\n💖 <b>Welcome, {esc(first_name)}!</b>\n\n"
+            f"I'm <b>{n}</b> {brand.EMOJI} — your AI, games &amp; social companion.\n\n{line}\n\n"
+            "💎 Economy • ⚔️ Battles • 🗝 Adventures\n\n"
+            "🐾 Pets • 💍 Family • 🎭 Social fun\n\n"
+            "🎓 Academy • 🛡 Group moderation\n\n"
+            f"✨ And many more features!\n\n{line}\n\n"
+            "👇 Add me to your group &amp; send /start")
+    return text, (welcome_group_kb() if group else welcome_kb(contacts))
 
 
-def welcome_kb() -> InlineKeyboardMarkup:
-    rows = [[B(text="🎮 Open Menu", callback_data="nav:main"), B(text="📖 Commands", callback_data="nav:help")],
-            [B(text="ℹ️ About", callback_data="nav:about"), B(text="👨‍👩‍👧 Family", callback_data="nav:family")]]
+def welcome_group_kb() -> InlineKeyboardMarkup:
+    return kb([[B(text="📖 Commands & Rules", callback_data="nav:help")],
+               [B(text="🎮 Features & Modes", callback_data="nav:main")],
+               [B(text="ℹ️ About the Bot", callback_data="nav:about")]])
+
+
+def welcome_kb(contacts: list[tuple[str, str]] | None = None) -> InlineKeyboardMarkup:
+    rows = []
     if brand.username():
         rows.append([B(text="➕ Add me to your group", url=brand.link("startgroup=true"))])
+    if contacts:
+        rows.append([B(text=t, url=u) for t, u in contacts])
     return kb(rows)
 
 
