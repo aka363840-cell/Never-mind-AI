@@ -1,8 +1,10 @@
 import logging
+from pathlib import Path
 
 from aiogram import Bot, F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandObject
-from aiogram.types import CallbackQuery, InlineKeyboardButton as B, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, FSInputFile, InlineKeyboardButton as B, InlineKeyboardMarkup, Message
 
 from database.models import AppState, GroupSetting, User
 from database.session import db
@@ -45,14 +47,38 @@ async def render(name: str, user: User):
     raise GameError("❌ Unknown page.")
 
 
-async def _first_time(uid: int) -> bool:
-    """True exactly once per user (flag lives in app_state -> included in every database backup)."""
-    async with db.tx() as s:
-        key = f"welcomed:{uid}"
-        if await s.get(AppState, key):
-            return False
-        s.add(AppState(key=key, value="1"))
-        return True
+VIDEO_PATH = Path(__file__).resolve().parent.parent / "assets" / "start_intro.mp4"
+_VIDEO_FID_KEY = "start_video_fid"
+
+
+async def _intro_video(m: Message) -> None:
+    """The /start intro video. Uploaded to Telegram only ONCE ever: the resulting file_id is cached in app_state
+    (-> included in every database backup) and reused for every later /start by every user - instant delivery,
+    no re-upload, no quality loss. If the cached id ever goes stale, we silently re-upload and re-cache it.
+    Never raises: a video problem must never block the rest of /start."""
+    try:
+        async with db.tx() as s:
+            row = await s.get(AppState, _VIDEO_FID_KEY)
+            fid = row.value if row else None
+        if fid:
+            try:
+                await m.answer_video(fid, supports_streaming=True)
+                return
+            except TelegramBadRequest:
+                fid = None            # stale/invalid cached id - fall through and re-upload below
+        if not VIDEO_PATH.exists():
+            return
+        sent = await m.answer_video(FSInputFile(VIDEO_PATH), supports_streaming=True)
+        new_fid = sent.video.file_id if sent.video else None
+        if new_fid:
+            async with db.tx() as s:
+                row = await s.get(AppState, _VIDEO_FID_KEY)
+                if row:
+                    row.value = new_fid
+                else:
+                    s.add(AppState(key=_VIDEO_FID_KEY, value=new_fid))
+    except Exception:
+        log.exception("intro video failed - continuing without it")
 
 
 @router.message(Command("rules", "rule", "guide"))
@@ -80,9 +106,10 @@ async def start(m: Message, command: CommandObject, bot: Bot, db_user: User):
         text, markup = await views.about() if payload == "about" else views.command_guide()
         await m.answer(text, reply_markup=markup)
         return
-    if m.text and m.text.lstrip().lower().startswith("/start") and await _first_time(db_user.id):
+    if m.text and m.text.lstrip().lower().startswith("/start"):
         try:
-            text, markup = await views.welcome(db_user.first_name)   # brand-new user: greeting + about + quick start
+            await _intro_video(m)                                     # every /start, not just the first ever - with the video
+            text, markup = await views.welcome(db_user.first_name)
             await m.answer(text, reply_markup=markup)
             return
         except Exception:                                            # /start must never fail: fall back to the plain menu

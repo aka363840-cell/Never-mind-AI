@@ -29,17 +29,23 @@ async def main(first_name: str) -> tuple[str, InlineKeyboardMarkup]:
 
 
 async def welcome(first_name: str) -> tuple[str, InlineKeyboardMarkup]:
-    """First /start of a brand-new user in DM: greeting + about + quick start."""
+    """Every /start in DM (not just the first ever): intro video + greeting + about + quick start."""
     text = (f"{banner()}\n\n💖 <b>Welcome, {esc(first_name)}!</b>\n"
-            f"I'm <b>{esc(brand.name())}</b> — your game, family &amp; fun companion on Telegram.\n\n"
+            f"I'm <b>{esc(brand.name())}</b> — your game, family &amp; fun companion on Telegram.\n"
+            f"{DIV}\n"
             f"✦ <b>What you can do here</b> ✦\n"
             "💎 Earn diamonds — /daily /work /fish /mine\n"
             "⚔️ Fight, duel &amp; collect powers\n"
             "🗝 Dungeons, 🐾 pets &amp; 🏰 clans\n"
             "💍 Marry, 👶 have kids, 👨‍👩‍👧‍👦 build a whole family\n"
             "🎭 40+ fun actions with GIFs — /hug /kiss /pat\n"
-            "🤖 AI chat in groups — tag me or say my name, in your own language\n\n"
-            f"{DIV}\n🎁 <b>First step:</b> send /daily to claim your reward!\n"
+            "🤖 AI chat in groups — tag me or say my name, in your own language\n"
+            f"{DIV}\n"
+            f"🆕 <b>New &amp; fresh</b>\n"
+            "🎓 <b>Academy Life</b> — enroll, pick a club, sit exams, go on adventures — /enroll\n"
+            "🛡 <b>Group Moderation</b> — a full admin toolkit for your group — /modhelp\n"
+            f"{DIV}\n"
+            f"🎁 <b>First step:</b> send /daily to claim your reward!\n"
             f"👥 Add me to your group and play with friends.")
     return text, welcome_kb()
 
