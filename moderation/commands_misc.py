@@ -261,9 +261,13 @@ NOTES = ("ℹ️ <b>Good to know</b>\n• Target = reply to a message, <code>@us
          "• <code>/modpanel</code> opens the interactive dashboard.")
 
 
+_LEGEND = ("🔤 <b>How to read this:</b> &lt;required&gt; · [optional] · <i>target</i> = reply to their message, "
+           "or <code>@username</code> / numeric ID · <i>duration</i> = <code>30s 15m 2h 3d 1w</code>\n")
+
+
 def _help_page(cat: str) -> str:
     items = [h for h in HELP if h["cat"] == cat]
-    lines = [f"<b>{CATS[cat]}</b>"]
+    lines = [f"<b>{CATS[cat]}</b>", _LEGEND]
     for h in items:
         al = " ".join(f"/{n}" for n in h["names"][1:])
         lines.append(f"\n<code>{esc(h['usage'])}</code>" + (f"  <i>(aliases: {al})</i>" if al else "") + f"\n   {esc(h['desc'])}")

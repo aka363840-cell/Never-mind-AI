@@ -121,7 +121,7 @@ def test_ai_cannot_reach_moderation_and_moderation_cannot_reach_ai():
     # 3) no moderation function that executes actions is importable from AI-adjacent code: only these files import the moderation package
     users = {str(f.relative_to(ROOT)) for f in ROOT.rglob("*.py")
              if "moderation" not in f.parts and "tests" not in f.parts and any(m == "moderation" or m.startswith("moderation.") for m in _imports(f))}
-    assert users == {"bot.py", "handlers/welcome.py"}, users
+    assert users == {"bot.py", "handlers/welcome.py", "handlers/start.py"}, users
 
 
 def test_moderation_never_touches_game_tables():

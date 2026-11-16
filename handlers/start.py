@@ -10,7 +10,7 @@ from database.models import AppState, GroupSetting, User
 from database.session import db
 from game.rules import R
 from handlers import views
-from keyboards.menus import kb
+from keyboards.menus import back, kb
 from utils import brand
 from services.errors import GameError
 from utils.telegram import safe_answer, safe_edit
@@ -25,6 +25,16 @@ PAGES = {
 
 
 async def render(name: str, user: User):
+    if name == "modhelp":
+        rows: list = []
+        try:                                        # moderation is a separate optional module; never let /start break if it's missing
+            from moderation.commands_misc import _help_kb
+            rows = list(_help_kb().inline_keyboard)
+        except Exception:
+            log.exception("moderation help unavailable")
+        if not rows:
+            return ("🛡 <b>Moderation help</b>\nNot available right now — try <code>/modhelp</code> directly.", kb([back("main")]))
+        return ("🛡 <b>Moderation help</b>\nEvery admin command, explained simply. Pick a category:", kb(rows))
     if name == "main":
         return await views.main(user.first_name)
     if name in ("profile", "balance", "powers", "missions"):

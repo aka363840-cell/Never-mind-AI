@@ -30,7 +30,7 @@ async def main(first_name: str) -> tuple[str, InlineKeyboardMarkup]:
 
 async def welcome(first_name: str, group: bool = False, contacts: list[tuple[str, str]] | None = None) -> tuple[str, InlineKeyboardMarkup]:
     """/start card (sent as the caption of the intro video). DM: add-to-group + owner buttons.
-    Group: three hub buttons that open everything in the same message."""
+    Group: just 2 hub buttons - between them they open every feature and every admin command, in the same message."""
     line = "━━━━━━━━━━━━━━━━"
     n = esc(brand.name())
     text = (f"{banner()}\n\n💖 <b>Welcome, {esc(first_name)}!</b>\n\n"
@@ -39,14 +39,13 @@ async def welcome(first_name: str, group: bool = False, contacts: list[tuple[str
             "🐾 Pets • 💍 Family • 🎭 Social fun\n\n"
             "🎓 Academy • 🛡 Group moderation\n\n"
             f"✨ And many more features!\n\n{line}\n\n"
-            "👇 Add me to your group &amp; send /start")
+            "Every command works here directly - no need to tag me.")
     return text, (welcome_group_kb() if group else welcome_kb(contacts))
 
 
 def welcome_group_kb() -> InlineKeyboardMarkup:
-    return kb([[B(text="📖 Commands & Rules", callback_data="nav:help")],
-               [B(text="🎮 Features & Modes", callback_data="nav:main")],
-               [B(text="ℹ️ About the Bot", callback_data="nav:about")]])
+    return kb([[B(text="🎮 Open Menu (every feature)", callback_data="nav:main")],
+               [B(text="🛡 Moderation Help (every admin cmd)", callback_data="nav:modhelp")]])
 
 
 def welcome_kb(contacts: list[tuple[str, str]] | None = None) -> InlineKeyboardMarkup:
@@ -113,6 +112,7 @@ def command_guide(cat: int | None = None, compact: bool = False, page: int = 0) 
         btns = [B(text=t, callback_data=f"help:c{i}") for i, (t, _) in enumerate(secs)]
         rows += [btns[i:i + 2] for i in range(0, len(btns), 2)]
         rows.append([B(text="📜 Rules (kill, rob, protection…)", callback_data="rules:home")])
+        rows.append([B(text="🛡 Moderation (Admins, groups)", callback_data="nav:modhelp")])
     else:
         cat = int(cat)
         title, pages = secs[cat]
