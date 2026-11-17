@@ -48,6 +48,7 @@ class User(Base):
     is_flagged: Mapped[bool] = mapped_column(Boolean, default=False)  # excluded from rankings
     ban_reason: Mapped[str | None] = mapped_column(String(256))
     blocked_bot: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_account: Mapped[bool] = mapped_column(Boolean, default=False)  # Telegram reported the account as deactivated
 
 
 class Wallet(Base):
@@ -245,6 +246,8 @@ class GroupSetting(Base):
     ai_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     games_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    removed: Mapped[bool] = mapped_column(Boolean, default=False)  # bot was kicked/left - row is kept (history), just flagged
+    removed_at: Mapped[datetime | None] = mapped_column(TS)
 
 
 class GroupStat(Base):

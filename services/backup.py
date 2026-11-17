@@ -77,9 +77,22 @@ def _summary(path: str) -> str:
     try:
         have = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         parts = [f"{con.execute(f'SELECT COUNT(*) FROM {t}').fetchone()[0]} {label}" for t, label in TRACKED.items() if t in have]
+        line = "📦 " + " · ".join(parts)
+        if "users" in have:
+            cols = {r[1] for r in con.execute("PRAGMA table_info(users)")}
+            if {"blocked_bot", "deleted_account"} <= cols:
+                blocked = con.execute("SELECT COUNT(*) FROM users WHERE blocked_bot=1").fetchone()[0]
+                deleted = con.execute("SELECT COUNT(*) FROM users WHERE deleted_account=1").fetchone()[0]
+                line += f"\n🚫 {blocked} blocked the bot · 👻 {deleted} deleted accounts"
+        if "group_settings" in have:
+            cols = {r[1] for r in con.execute("PRAGMA table_info(group_settings)")}
+            if "removed" in cols:
+                groups = con.execute("SELECT COUNT(*) FROM group_settings WHERE removed=0").fetchone()[0]
+                removed = con.execute("SELECT COUNT(*) FROM group_settings WHERE removed=1").fetchone()[0]
+                line += f"\n💬 {groups} groups (+{removed} removed, kept for history)"
     finally:
         con.close()
-    return "📦 " + " · ".join(parts)
+    return line
 
 
 async def summary(path: Path | str) -> str:
@@ -98,4 +111,5 @@ async def restore_backup(url: str, src_path: str) -> int:
     n = await asyncio.to_thread(_restore, src_path, live)
     from database.session import db
     await db.create_all()             # an older backup may lack newer tables (e.g. relations): create them empty
+    await db.ensure_columns()         # ...or lack newer columns on an existing table: add those too
     return n

@@ -29,10 +29,10 @@ async def touch(tg_id: int, username: str | None, first_name: str) -> User:
             u = await s.get(User, tg_id)
             return u
         if (u.username != username or u.first_name != first_name
-                or aware(u.last_seen) < utcnow() - timedelta(seconds=60) or u.blocked_bot):
+                or aware(u.last_seen) < utcnow() - timedelta(seconds=60) or u.blocked_bot or u.deleted_account):
             await s.execute(update(User).where(User.id == tg_id).values(
                 username=username, username_lc=username.lower() if username else None,
-                first_name=first_name, last_seen=utcnow(), blocked_bot=False))
+                first_name=first_name, last_seen=utcnow(), blocked_bot=False, deleted_account=False))
             await s.refresh(u)
         return u
 
@@ -73,13 +73,30 @@ async def mark_blocked(uid: int) -> None:
         await s.execute(update(User).where(User.id == uid).values(blocked_bot=True))
 
 
+async def mark_deleted(uid: int) -> None:
+    """Telegram told us this account was deactivated/deleted - stop messaging it (counted separately from blocked_bot)."""
+    async with db.tx() as s:
+        await s.execute(update(User).where(User.id == uid).values(deleted_account=True, blocked_bot=True))
+
+
 async def touch_group(chat_id: int, title: str | None) -> GroupSetting:
     async with db.tx() as s:
         g = await s.get(GroupSetting, chat_id)
         if g is None:
             await insert_ignore(s, GroupSetting, dict(chat_id=chat_id, title=title, created_at=utcnow()))
             g = await s.get(GroupSetting, chat_id)
+        elif g.removed or g.title != title:           # re-added after being removed, or just a title change
+            await s.execute(update(GroupSetting).where(GroupSetting.chat_id == chat_id)
+                            .values(title=title, removed=False, removed_at=None))
+            await s.refresh(g)
         return g
+
+
+async def mark_group_removed(chat_id: int) -> None:
+    """The bot was kicked from / left a group. The row (and its history) is kept, just flagged - so stats
+    can tell 'groups I'm in' from 'groups I used to be in', and broadcasts stop targeting it."""
+    async with db.tx() as s:
+        await s.execute(update(GroupSetting).where(GroupSetting.chat_id == chat_id).values(removed=True, removed_at=utcnow()))
 
 
 async def get_state(key: str, default: str = "") -> str:

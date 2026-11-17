@@ -60,8 +60,10 @@ async def stats(m: Message):
     adm.authorize(m.from_user.id, "stats")
     d = await adm.server_stats()
     await m.reply(f"📊 <b>{esc(brand.name())} stats</b>\n"
-                  f"👥 Users: <b>{num(d['users'])}</b> (+{d['new_24h']} today, {d['active_24h']} active 24h, {d['banned']} banned)\n"
-                  f"💬 Groups: <b>{d['groups']}</b>\n💎 Diamonds in circulation: <b>{num(d['circulation'])}</b>\n"
+                  f"👥 Started the bot: <b>{num(d['users'])}</b> (+{d['new_24h']} today, {d['active_24h']} active 24h)\n"
+                  f"🚫 {d['banned']} banned · 🔇 {d['blocked']} blocked the bot · 👻 {d['deleted']} deleted accounts\n"
+                  f"💬 Groups: <b>{d['groups']}</b> (+{d['groups_removed']} removed, kept for history)\n"
+                  f"💎 Diamonds in circulation: <b>{num(d['circulation'])}</b>\n"
                   f"🧾 Transactions (24h): <b>{num(d['tx24'])}</b>\n🏰 Clans: {d['clans']} · 🐾 Pets: {d['pets']}\n"
                   f"💍 Marriages: {d['marriages']} · 👨‍👩‍👧 Relations: {d['relations']}\n"
                   f"🎁 Open group events: {d['open_events']}")

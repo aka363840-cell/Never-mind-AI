@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
-from sqlalchemy import event, insert
+from sqlalchemy import event, inspect as sa_inspect, insert
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 from database.models import Base
+
+log = logging.getLogger(__name__)
 
 
 class Database:
@@ -55,6 +58,31 @@ class Database:
         assert self.engine is not None
         async with self.engine.begin() as c:
             await c.run_sync(Base.metadata.create_all)
+
+    async def ensure_columns(self) -> None:
+        """Defensive auto-heal for a database that already existed before a column was added to the code
+        (create_all() above only creates brand-new tables - it never alters an existing one). Adds any column
+        that's on the ORM models but missing from the live table, with a safe default; never drops, renames
+        or touches anything else. SQLite only - a real production Postgres uses Alembic migrations instead."""
+        assert self.engine is not None
+        if self.dialect != "sqlite":
+            return
+        async with self.engine.begin() as c:
+            for table in Base.metadata.sorted_tables:
+                try:
+                    existing = {col["name"] for col in await c.run_sync(lambda conn, t=table.name: sa_inspect(conn).get_columns(t))}
+                except Exception:
+                    continue                           # table doesn't exist yet - create_all() will have made it with every column
+                for col in table.columns:
+                    if col.name in existing:
+                        continue
+                    try:
+                        ddl = col.type.compile(dialect=self.engine.dialect)
+                        default = "" if col.nullable else (" DEFAULT 0" if col.type.python_type in (bool, int) else " DEFAULT ''")
+                        await c.exec_driver_sql(f'ALTER TABLE "{table.name}" ADD COLUMN "{col.name}" {ddl}{default}')
+                        log.info("added missing column %s.%s", table.name, col.name)
+                    except Exception:
+                        log.exception("could not add column %s.%s", table.name, col.name)
 
     async def dispose(self) -> None:
         if self.engine:

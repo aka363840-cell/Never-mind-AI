@@ -119,7 +119,8 @@ async def recent_logs(n: int = 15) -> list[AdminLog]:
 
 async def broadcast_targets() -> list[int]:
     async with db.tx() as s:
-        return list((await s.execute(select(User.id).where(User.is_banned == False, User.blocked_bot == False))).scalars())  # noqa: E712
+        return list((await s.execute(select(User.id).where(User.is_banned == False, User.blocked_bot == False,  # noqa: E712
+                                                            User.deleted_account == False))).scalars())  # noqa: E712
 
 
 async def server_stats() -> dict:
@@ -134,7 +135,10 @@ async def server_stats() -> dict:
         new_24h = (await one(select(func.count()).select_from(User).where(User.created_at >= day))).scalar()
         active_24h = (await one(select(func.count()).select_from(User).where(User.last_seen >= day))).scalar()
         banned = (await one(select(func.count()).select_from(User).where(User.is_banned == True))).scalar()  # noqa: E712
-        groups = (await one(select(func.count()).select_from(GroupSetting))).scalar()
+        blocked = (await one(select(func.count()).select_from(User).where(User.blocked_bot == True))).scalar()  # noqa: E712
+        deleted = (await one(select(func.count()).select_from(User).where(User.deleted_account == True))).scalar()  # noqa: E712
+        groups = (await one(select(func.count()).select_from(GroupSetting).where(GroupSetting.removed == False))).scalar()  # noqa: E712
+        groups_removed = (await one(select(func.count()).select_from(GroupSetting).where(GroupSetting.removed == True))).scalar()  # noqa: E712
         from database.models import Wallet
         circ = (await one(select(func.coalesce(func.sum(Wallet.balance + Wallet.bank), 0)))).scalar()
         tx24 = (await one(select(func.count()).select_from(Transaction).where(Transaction.created_at >= day))).scalar()
@@ -143,5 +147,6 @@ async def server_stats() -> dict:
         from database.models import Marriage, Relation
         marriages = (await one(select(func.count()).select_from(Marriage))).scalar()
         relations = (await one(select(func.count()).select_from(Relation))).scalar()
-    return dict(users=users_n, new_24h=new_24h, active_24h=active_24h, banned=banned, groups=groups, circulation=int(circ),
+    return dict(users=users_n, new_24h=new_24h, active_24h=active_24h, banned=banned, blocked=blocked, deleted=deleted,
+                groups=groups, groups_removed=groups_removed, circulation=int(circ),
                 tx24=tx24, clans=clans, pets=pets, marriages=marriages, relations=relations, open_events=len(events.BOSSES) + len(events.DROPS))

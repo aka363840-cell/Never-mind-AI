@@ -137,6 +137,19 @@ async def added_to_group(ev: ChatMemberUpdated, bot: Bot):
         pass
 
 
+@router.my_chat_member(ChatMemberUpdatedFilter(member_status_changed=LEAVE_TRANSITION))
+async def removed_from_group(ev: ChatMemberUpdated) -> None:
+    """The bot itself was kicked from, or left, a group. Flag it (never delete the row - its history stays)
+    so /stats can report 'groups removed' separately from groups we're still in, and broadcasts skip it."""
+    if ev.chat.type not in ("group", "supergroup"):
+        return
+    from services import users
+    try:
+        await users.mark_group_removed(ev.chat.id)
+    except Exception:
+        log.exception("failed to flag group %s as removed", ev.chat.id)
+
+
 JOIN_REQUEST_DM = (
     "Your join request has been received! An admin or moderator will need to approve it before you can join.\n\n"
     "In the meantime, feel free to /start the bot and explore!"

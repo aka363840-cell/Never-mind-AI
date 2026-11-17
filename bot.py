@@ -165,6 +165,7 @@ async def main() -> None:
         raise SystemExit("BOT_TOKEN and OWNER_ID must be set (see .env.example)")
     db.init(st.database_url)
     await db.create_all()          # idempotent: only creates tables that don't exist yet (clans, pets, ...)
+    await db.ensure_columns()      # idempotent: adds any column missing from an older, already-existing database
     try:
         from moderation import store as _mod_store
         await _mod_store.init_schema()                # own mod_* tables, additive migrations

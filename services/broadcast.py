@@ -22,10 +22,12 @@ log = logging.getLogger(__name__)
 _tasks: set[asyncio.Task] = set()
 _running = False
 
+RATE = 25  # sustained messages/second. Telegram's own bulk-notification guideline is ~30/s globally; this leaves headroom.
+
 
 async def group_ids() -> list[int]:
     async with db.tx() as s:
-        return list((await s.execute(select(GroupSetting.chat_id))).scalars())
+        return list((await s.execute(select(GroupSetting.chat_id).where(GroupSetting.removed == False))).scalars())  # noqa: E712
 
 
 async def targets(scope: str) -> list[int]:
@@ -47,9 +49,14 @@ async def _send_one(bot: Bot, chat_id: int, p: dict) -> str:
             return "ok"
         except TelegramRetryAfter as e:
             await asyncio.sleep(e.retry_after + 1)
-        except TelegramForbiddenError:
+        except TelegramForbiddenError as e:
             if chat_id > 0:
+                if "deactivated" in str(e).lower():        # Telegram's own wording for a deleted/deactivated account
+                    await users.mark_deleted(chat_id)
+                    return "deleted"
                 await users.mark_blocked(chat_id)
+                return "blocked"
+            await users.mark_group_removed(chat_id)        # bot was kicked from / left this group
             return "blocked"
         except (TelegramNetworkError, asyncio.TimeoutError):
             await asyncio.sleep(2)
@@ -63,12 +70,17 @@ async def _run(bot: Bot, admin_id: int, p: dict) -> None:
     global _running
     try:
         ids = await targets(p.get("scope", "all"))
-        c = {"ok": 0, "blocked": 0, "fail": 0}
-        for cid in ids:
-            c[await _send_one(bot, cid, p)] += 1
-            await asyncio.sleep(0.05)            # ~20 msg/s, under Telegram's limit
-        await bot.send_message(admin_id, f"📣 Broadcast done: {c['ok']} delivered, {c['blocked']} blocked/left, {c['fail']} failed (of {len(ids)}).",
-                               parse_mode=None)
+        c = {"ok": 0, "blocked": 0, "deleted": 0, "fail": 0}
+        sem = asyncio.Semaphore(RATE)
+
+        async def worker(cid: int) -> None:
+            async with sem:
+                c[await _send_one(bot, cid, p)] += 1
+                await asyncio.sleep(1)    # hold this slot for 1s -> sustained rate stays at RATE/s, not RATE all at once
+
+        await asyncio.gather(*(worker(cid) for cid in ids))
+        await bot.send_message(admin_id, f"📣 Broadcast done: {c['ok']} delivered, {c['blocked']} blocked/left, "
+                               f"{c['deleted']} deleted accounts, {c['fail']} failed (of {len(ids)}).", parse_mode=None)
     except Exception:
         log.exception("broadcast crashed")
         try:
