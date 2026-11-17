@@ -258,6 +258,23 @@ class GroupStat(Base):
     wins: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class GroupMember(Base):
+    """Who the bot has seen in which group (written once per person per group per day by services/waifu.py, never per
+    message). Telegram has no 'list members' call for bots, so this roster is what /waifu picks from."""
+    __tablename__ = "group_members"
+    chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+
+
+class WaifuPick(Base):
+    """/waifu: one row per player = their current pick. Entirely separate from marriages / relations / family."""
+    __tablename__ = "waifu_picks"
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    waifu_id: Mapped[int] = mapped_column(BigInteger)
+    bond: Mapped[int] = mapped_column(Integer)
+    picked_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+
+
 class Marriage(Base):
     """One row per couple (user_a is the smaller id). A player can be in at most one marriage (enforced under row locks)."""
     __tablename__ = "marriages"

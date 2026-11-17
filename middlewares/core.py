@@ -101,6 +101,7 @@ class CoreMiddleware(BaseMiddleware):
                 if not nm.is_bot:
                     try:
                         await users.touch(nm.id, nm.username, nm.full_name or nm.first_name)
+                        await users.note_member(event.chat.id, nm.id)
                     except Exception:
                         pass
         if in_group:
@@ -108,6 +109,7 @@ class CoreMiddleware(BaseMiddleware):
             _ev.note_activity(event.chat.id)
         if in_group and not (event.text or "").startswith("/") and not (event.new_chat_members or event.left_chat_member):
             await users.note_seen(tg)          # remember who is in the group, so tagging them later always works
+            await users.note_member(event.chat.id, tg.id)      # ...and the per-group roster /waifu picks from
             # group chatter that isn't for the bot (no @mention / reply / its name): skip the rest of the DB work
             if "plain_mod" not in data and not addressed(event, await data["bot"].me())[0]:
                 return

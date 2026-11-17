@@ -37,6 +37,20 @@ async def touch(tg_id: int, username: str | None, first_name: str) -> User:
         return u
 
 
+async def note_member(chat_id: int, uid: int) -> None:
+    """Remember that uid is in this group (for /waifu). One insert-ignore per pair per day; never raises."""
+    try:
+        from services.kv import kv
+        if await kv.get(f"gm:{chat_id}:{uid}"):
+            return
+        from database.models import GroupMember
+        async with db.tx() as s:
+            await insert_ignore(s, GroupMember, dict(chat_id=chat_id, user_id=uid))
+        await kv.put(f"gm:{chat_id}:{uid}", "1", 86400)
+    except Exception:
+        pass
+
+
 async def note_seen(tg) -> None:
     """Group members are registered the first time they write (re-checked every 6h), so replying to / tagging
     / @-mentioning them works without them ever pressing /start. Never raises."""
