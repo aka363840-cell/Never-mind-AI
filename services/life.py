@@ -136,29 +136,6 @@ async def have_baby(uid: int, wanted_name: str | None) -> tuple[bool, str, str]:
         return True, name, g
 
 
-async def sex_baby(a: int, b: int) -> tuple[str, str, str]:
-    """After an accepted /sex: maybe a real child joins BOTH players' family. -> (outcome, name, gender)
-    outcome: born | none (unlucky roll) | full (a parent already has MAX_KIDS) | cooldown | poor (asker lacks BABY_COST).
-    Cost BABY_COST (from the asker, only when a baby actually arrives), 40% chance, 12h cooldown per asker."""
-    async with db.tx() as s:
-        for uid in (a, b):
-            n = (await s.execute(select(func.count()).select_from(Child).where(or_(Child.parent_a == uid, Child.parent_b == uid)))).scalar() or 0
-            if n >= MAX_KIDS:
-                return "full", "", ""
-        if (await economy.wallet_of(s, a)).balance < BABY_COST:
-            return "poor", "", ""
-        if await cooldowns.remaining(s, a, "sexbaby"):
-            return "cooldown", "", ""
-        await cooldowns.set_(s, a, "sexbaby", BABY_CD_S)
-        if _rng.random() > 0.4:
-            return "none", "", ""
-        await economy.apply(s, a, wallet=-BABY_COST, kind="baby", counterparty=b)
-        g = _rng.choice("bg")
-        name = _kid_name(g, None)
-        s.add(Child(parent_a=min(a, b), parent_b=max(a, b), name=name, gender=g, adopted=False, born_at=utcnow()))
-        return "born", name, g
-
-
 async def purge_random_adopted() -> tuple[int, int]:
     """Owner maintenance: delete every ADOPTED child that carries one of the old auto-generated names (BOY / GIRL pools),
     for all players. Born children and custom-named adoptions are untouched. -> (children removed, parents affected)"""

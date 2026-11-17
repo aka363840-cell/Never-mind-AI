@@ -156,18 +156,13 @@ async def answer(cb: CallbackQuery, bot: Bot):
         return
     text = f"{emoji} " + random.choice(yes).format(a=a, b=b)
     photo = False
-    if d["act"] == "sex":
-        from services import life
-        outcome, kid, g = await life.sex_baby(d["a"], d["b"])
-        if outcome == "born":
-            gl, ge = ("baby girl", "👧") if g == "g" else ("baby boy", "👦")
-            text += "\n\n" + random.choice(BABY_LINES).format(a=a, b=b, g=f"{gl} named {esc(kid)}", e=ge) + "\n👨‍👩‍👧 Added to both families - see /family"
+    if d["act"] == "sex":                      # just for fun: not saved anywhere, no cost, nothing to do with /family
+        if random.random() < BABY_CHANCE:
+            gl, ge = random.choice([("baby girl", "👧"), ("baby boy", "👦")])
+            text += "\n\n" + random.choice(BABY_LINES).format(a=a, b=b, g=gl, e=ge)
             photo = True
         else:
-            text += "\n\n" + {"none": random.choice(NO_BABY),
-                              "full": "👨‍👩‍👧‍👦 No baby: one of you already has a full family (6 children).",
-                              "cooldown": "⏳ No baby this time - too soon after the last one (12h break).",
-                              "poor": f"💸 No baby this time - a baby costs {life.BABY_COST:,} 💎 from {a}'s wallet."}[outcome]
+            text += "\n\n" + random.choice(NO_BABY)
     try:
         await cb.message.delete()
     except Exception:
