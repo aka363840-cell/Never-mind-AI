@@ -84,6 +84,16 @@ def _summary(path: str) -> str:
                 blocked = con.execute("SELECT COUNT(*) FROM users WHERE blocked_bot=1").fetchone()[0]
                 deleted = con.execute("SELECT COUNT(*) FROM users WHERE deleted_account=1").fetchone()[0]
                 line += f"\n🚫 {blocked} blocked the bot · 👻 {deleted} deleted accounts"
+            if "started_dm" in cols:
+                st = con.execute("SELECT COUNT(*) FROM users WHERE started_dm=1").fetchone()[0]
+                go = con.execute("SELECT COUNT(*) FROM users WHERE started_dm=0").fetchone()[0]
+                line += f"\n✅ {st} started the bot in DM · 👀 {go} only seen in groups"
+        extra = []
+        for t, label in (("group_members", "group members remembered"), ("waifu_picks", "waifu picks")):
+            if t in have:
+                extra.append(f"{con.execute(f'SELECT COUNT(*) FROM {t}').fetchone()[0]} {label}")
+        if extra:
+            line += "\n🌸 " + " · ".join(extra)
         if "group_settings" in have:
             cols = {r[1] for r in con.execute("PRAGMA table_info(group_settings)")}
             if "removed" in cols:
