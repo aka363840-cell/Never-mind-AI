@@ -39,7 +39,7 @@ async def welcome(first_name: str, group: bool = False, contacts: list[tuple[str
             "🐾 Pets • 💍 Family • 🎭 Social fun\n\n"
             "🎓 Academy • 🛡 Group moderation\n\n"
             f"✨ And many more features!\n\n{line}\n\n"
-            "Every command works here directly - no need to tag me.")
+            + ("👇 Press any button to get started." if group else "👇 Add me to your group and /start."))
     return text, (welcome_group_kb() if group else welcome_kb(contacts))
 
 
