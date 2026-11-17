@@ -59,8 +59,8 @@ def _hit(src: Fighter, dst: Fighter, rng: random.Random, log: list[str]) -> int:
     if dst.power == "PHANTOM" and dst.charges > 0 and not crit:
         dst.charges -= 1
         dst.consumed.add("PHANTOM")
-        log.append(f"👻 {dst.name} phases out — hit avoided!")
-        return 0
+        dmg = dmg // 2                       # half of that hit is avoided (a full dodge decided almost every fight)
+        log.append(f"👻 {dst.name} phases out — hit halved!")
     if dst.power == "PHOENIX" and dst.charges > 0 and dmg >= dst.hp:
         dst.charges -= 1
         dst.consumed.add("PHOENIX")
@@ -69,7 +69,7 @@ def _hit(src: Fighter, dst: Fighter, rng: random.Random, log: list[str]) -> int:
     dst.hp = max(0, dst.hp - dmg)
     log.append(f"{'💥' if crit else '🗡'} {src.name} hits {dst.name} for {dmg}" + (" (CRIT)" if crit else ""))
     if dst.power == "MIRROR" and dmg > 0 and dst.hp > 0:
-        refl = min(15, int(dmg * 0.25 * dst.power_mult))
+        refl = min(6, int(dmg * 0.10 * dst.power_mult))
         refl = min(refl, max(0, src.hp - 1))
         if refl:
             src.hp -= refl

@@ -47,7 +47,7 @@ POWERS: dict[str, PowerDef] = {
     p.key: p
     for p in [
         PowerDef("PHANTOM", "Phantom", "👻", 3000, 150, 2400, 900,
-                 "Avoid ONE incoming hit while active.",
+                 "Halve ONE incoming hit while active.",
                  "Single charge. Critical hits cannot be avoided."),
         PowerDef("REAPER", "Reaper", "💀", 4000, 200, 2400, 600,
                  "+20% damage dealt while active (+10% per upgrade).",
@@ -56,8 +56,8 @@ POWERS: dict[str, PowerDef] = {
                  "Grant another player temporary protection (reply to them with /activate).",
                  "Cannot target yourself or an already-protected player. Short protection."),
         PowerDef("MIRROR", "Mirror", "🪞", 3500, 200, 2400, 600,
-                 "Reflect 25% of incoming damage (+10% per upgrade).",
-                 "Reflected damage is capped at 15 per hit and cannot kill."),
+                 "Reflect 10% of incoming damage (+10% per upgrade).",
+                 "Reflected damage is capped at 6 per hit and cannot kill."),
         PowerDef("ORACLE", "Oracle", "🔮", 2000, 100, 1200, 0,
                  "Scan another player (reply with /activate): level, combat stats, power, protection.",
                  "Never reveals wallet or bank balances."),
