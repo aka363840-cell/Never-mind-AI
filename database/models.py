@@ -269,6 +269,14 @@ class GroupMember(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
 
 
+class Afk(Base):
+    """/afk: one row per away player (removed when they write again). Part of the DB, so backups keep it."""
+    __tablename__ = "afk"
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    reason: Mapped[str] = mapped_column(String(120), default="")
+    since: Mapped[datetime] = mapped_column(TS, default=utcnow)
+
+
 class WaifuPick(Base):
     """/waifu: one row per player = their current pick. Entirely separate from marriages / relations / family."""
     __tablename__ = "waifu_picks"

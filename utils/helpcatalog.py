@@ -34,6 +34,7 @@ GROUP_MENU_EXTRA = ("ask", "settings")
 # name -> description ("{name}" / "{emoji}" are replaced with the bot's name / emoji)
 DESC_LIST: list[tuple[str, str]] = [
     ('start', '{emoji} Open the {name} menu'),
+    ('afk', '😴 Go away: /afk [reason] - I tell people who tag you, and welcome you back when you write'),
     ('waifu', '🌸 Your Waifu of the Day: a random member of this group, the same one for 24h in every group (not family)'),
     ('help', '📖 Command guide'),
     ('rules', '📜 Rules: kill, rob, protection, money… with the exact numbers'),
@@ -301,7 +302,7 @@ CATEGORIES: list[tuple[str, list[str]]] = [
                           "familytree", "addfamily", "unfamily", "roles", "gender", "familybonus", "ship",
                           "father", "mother", "brother", "sister", "@roles"]),
     ("🎭 Social & Fun", ["actions", "hug", "slap", "kiss", "compliment", "roast", "truth", "dare", "joke", "fact", "horoscope",
-                         "fortune", "iq", "lucky", "rate", "waifu", "@actions"]),
+                         "fortune", "iq", "lucky", "rate", "waifu", "afk", "@actions"]),
     ("Academy 🎓", ["enroll", "academy", "schedule", "study", "attend", "hangout", "rest", "club", "parttime", "exam", "grades", "classrank",
                       "rival", "rivalduel", "crush", "crushoff", "campuscouple", "campusdate", "clubs", "buddy", "adventure", "academyremind", "reportcard", "halloffame", "academyhelp"]),
     ("🤖 AI Chat", ["ask"]),
