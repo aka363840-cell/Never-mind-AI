@@ -83,8 +83,36 @@ async def find_by_username(username: str) -> int | None:
 
 
 async def mark_blocked(uid: int) -> None:
+    """They blocked the bot in a private chat (so they had started it before)."""
     async with db.tx() as s:
-        await s.execute(update(User).where(User.id == uid).values(blocked_bot=True))
+        await s.execute(update(User).where(User.id == uid).values(blocked_bot=True, started_dm=True))
+
+
+async def mark_started(uid: int) -> None:
+    """They opened a private chat with the bot (or unblocked it): we can DM them."""
+    async with db.tx() as s:
+        await s.execute(update(User).where(User.id == uid, User.started_dm.is_not(True))
+                        .values(started_dm=True, blocked_bot=False))
+
+
+async def set_dm_status(ids: list[int], started: bool) -> None:
+    """Bulk result of a broadcast / /syncusers run: True = a message got through, False = Telegram says the chat doesn't exist
+    (the person never started the bot in private)."""
+    for i in range(0, len(ids), 500):
+        chunk = ids[i:i + 500]
+        async with db.tx() as s:
+            vals = dict(started_dm=True, blocked_bot=False) if started else dict(started_dm=False)
+            await s.execute(update(User).where(User.id.in_(chunk)).values(**vals))
+
+
+async def repair_blocked_once() -> None:
+    """One-time clean-up: an old bug marked people as 'blocked' whenever the bot was refused in a GROUP (muted, no rights...).
+    Clear every blocked flag once; the next broadcast or /syncusers re-flags only the people who really blocked the bot."""
+    if await get_state("repair_blocked_v1", "0") == "1":
+        return
+    async with db.tx() as s:
+        await s.execute(update(User).where(User.blocked_bot == True).values(blocked_bot=False))  # noqa: E712
+        await set_state(s, "repair_blocked_v1", "1")
 
 
 async def mark_deleted(uid: int) -> None:

@@ -167,6 +167,11 @@ async def main() -> None:
     await db.create_all()          # idempotent: only creates tables that don't exist yet (clans, pets, ...)
     await db.ensure_columns()      # idempotent: adds any column missing from an older, already-existing database
     try:
+        from services import users as _users
+        await _users.repair_blocked_once()
+    except Exception:
+        log.exception("blocked-flag repair failed")
+    try:
         from moderation import store as _mod_store
         await _mod_store.init_schema()                # own mod_* tables, additive migrations
     except Exception:

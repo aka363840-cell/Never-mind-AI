@@ -17,7 +17,7 @@ from game.rules import R
 # Commands for the owner / moderators. Never listed in the menu or in /help.
 STAFF = frozenset({
     "admin", "stats", "backup", "backupdb", "restoredb", "give", "take", "setbalance", "ban", "unban", "mute",
-    "unmute", "userinfo", "logs", "maintenance", "broadcast", "emojiid", "seticon", "delicon", "aitest", "drop",
+    "unmute", "userinfo", "logs", "maintenance", "broadcast", "syncusers", "emojiid", "seticon", "delicon", "aitest", "drop",
     "boss", "purgeadopted", "academyadvance", "academyreset",
     "gameban", "gameunban", "gamemute", "gameunmute", "botban", "botunban", "botmute", "botunmute",
 })

@@ -2,6 +2,7 @@
 import logging
 
 from aiogram import Bot, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import Message
 
@@ -13,10 +14,21 @@ router = Router()
 log = logging.getLogger(__name__)
 
 
+async def _still_here(bot: Bot, chat_id: int, uid: int) -> bool:
+    try:
+        mem = await bot.get_chat_member(chat_id, uid)
+        return mem.status in ("member", "administrator", "creator") or (mem.status == "restricted" and getattr(mem, "is_member", True))
+    except TelegramBadRequest:
+        return False
+    except Exception:
+        return True                                            # a hiccup is no reason to drop someone
+
+
 @router.message(Command("waifu"))
 async def waifu_cmd(m: Message, bot: Bot, db_user: User):
     in_group = m.chat.type in ("group", "supergroup")
-    r = await wf.pick(db_user.id, m.chat.id if in_group else None)
+    r = await wf.pick(db_user.id, m.chat.id if in_group else None,
+                      (lambda uid: _still_here(bot, m.chat.id, uid)) if in_group else None)
     if not r.ok:
         await m.reply("🌸 Use /waifu in a group — I pick your waifu of the day from its members." if r.reason == "group" else
                       "🌸 I haven't seen enough members in this group yet. Chat for a bit, then try /waifu again!")

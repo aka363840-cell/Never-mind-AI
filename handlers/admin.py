@@ -52,7 +52,7 @@ async def _ask(m: Message, action: str, args: dict, summary: str):
 async def admin_help(m: Message):
     await m.reply("🔧 <b>Admin</b> (" + adm.role(m.from_user.id) + ")\n/give /take /setbalance &lt;target&gt; &lt;amount&gt;\n"
                   "/ban &lt;target&gt; [reason] · /unban · /mute · /unmute  (owner: no slash needed — reply with \"ban\" / \"mute\" / \"unban\")\n/userinfo &lt;target&gt; · /logs [n]\n"
-                  "/broadcast &lt;text&gt; · /maintenance on|off · /stats · /backupdb · /restoredb · /emojiid · /seticon · /delicon · /aitest (owner) · /drop · /boss (in groups)\n\nTarget = reply, @user or ID. Works in DM and in groups. State changes need a confirm tap.")
+                  "/broadcast &lt;text&gt; · /syncusers · /maintenance on|off · /stats · /backupdb · /restoredb · /emojiid · /seticon · /delicon · /aitest (owner) · /drop · /boss (in groups)\n\nTarget = reply, @user or ID. Works in DM and in groups. State changes need a confirm tap.")
 
 
 @router.message(Command("stats"))
@@ -60,7 +60,9 @@ async def stats(m: Message):
     adm.authorize(m.from_user.id, "stats")
     d = await adm.server_stats()
     await m.reply(f"📊 <b>{esc(brand.name())} stats</b>\n"
-                  f"👥 Started the bot: <b>{num(d['users'])}</b> (+{d['new_24h']} today, {d['active_24h']} active 24h)\n"
+                  f"👥 Known people: <b>{num(d['users'])}</b> (+{d['new_24h']} today, {d['active_24h']} active 24h)\n"
+                  f"✅ Started the bot in DM: <b>{num(d['started'])}</b> · 👀 Only seen in groups: {num(d['group_only'])}"
+                  + (f" · ❔ Not checked yet: {num(d['unverified'])} (run /syncusers)" if d['unverified'] else "") + "\n"
                   f"🚫 {d['banned']} banned · 🔇 {d['blocked']} blocked the bot · 👻 {d['deleted']} deleted accounts\n"
                   f"💬 Groups: <b>{d['groups']}</b> (+{d['groups_removed']} removed, kept for history)\n"
                   f"💎 Diamonds in circulation: <b>{num(d['circulation'])}</b>\n"
@@ -227,6 +229,16 @@ async def broadcast(m: Message, command: CommandObject):
         raise GameError("Usage: /broadcast [users|groups|all] &lt;text&gt;  — or reply to ANY message (photo, video, sticker, file…) with /broadcast")
     n = len(await bc.targets(scope))
     await _ask(m, "broadcast", {**payload, "scope": scope}, f"send {what}\nto <b>{n}</b> chats (<i>{scope}</i>)")
+
+
+@router.message(Command("syncusers"))
+async def syncusers(m: Message, bot: Bot):
+    """Owner: quietly check every known person once (invisible, no messages) so /stats and broadcasts know who really started the bot."""
+    adm.authorize(m.from_user.id, "syncusers")
+    from services import broadcast as bc
+    if not bc.sync(bot, m.from_user.id):
+        raise GameError("⏳ A broadcast / sync is already running.")
+    await m.reply("🔎 Sync started in the background (nothing is sent to anyone). I'll message you when it's done.")
 
 
 @router.message(Command("emojiid"))

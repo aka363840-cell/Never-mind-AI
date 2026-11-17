@@ -49,6 +49,9 @@ class User(Base):
     ban_reason: Mapped[str | None] = mapped_column(String(256))
     blocked_bot: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_account: Mapped[bool] = mapped_column(Boolean, default=False)  # Telegram reported the account as deactivated
+    # Has this person ever opened a private chat with the bot? True = yes (we can DM them), False = only ever seen in groups
+    # (Telegram refuses to DM them), None = not checked yet (rows from before this column existed; /syncusers sorts them).
+    started_dm: Mapped[bool | None] = mapped_column(Boolean, default=False)
 
 
 class Wallet(Base):

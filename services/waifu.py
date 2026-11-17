@@ -10,7 +10,7 @@ import random
 from dataclasses import dataclass
 from datetime import timedelta
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from database.models import GroupMember, GroupStat, User, WaifuPick, aware, utcnow
 from database.session import db, insert_ignore
@@ -30,7 +30,9 @@ class Result:
     fresh: bool = False                        # picked just now (False = the existing pick for the day)
 
 
-async def pick(owner_id: int, chat_id: int | None) -> Result:
+async def pick(owner_id: int, chat_id: int | None, check=None) -> Result:
+    """check: optional async callable uid -> bool ("is this person still in the group?"). Candidates are tried in random
+    order until one passes; the ones that don't are dropped from this group's roster."""
     lock = _locks.setdefault(owner_id, asyncio.Lock())
     async with lock:
         now = utcnow()
@@ -49,14 +51,26 @@ async def pick(owner_id: int, chat_id: int | None) -> Result:
             if ids:
                 pool = list((await s.execute(select(User).where(User.id.in_(ids), User.is_banned == False,  # noqa: E712
                                                                  User.deleted_account == False))).scalars())   # noqa: E712
-            if row and len(pool) > 1:
-                pool = [u for u in pool if u.id != row.waifu_id] or pool      # a fresh face after the 24h, when there is one
-            if not pool:
+            prev = row.waifu_id if row else None
+        random.shuffle(pool)
+        if prev is not None and len(pool) > 1:
+            pool.sort(key=lambda u: u.id == prev)                       # the previous waifu goes last: a fresh face when there is one
+        chosen = None
+        gone: list[int] = []
+        for u in pool[:15]:
+            if check is None or await check(u.id):                       # network calls happen outside the DB transaction
+                chosen = u
+                break
+            gone.append(u.id)
+        async with db.tx() as s:
+            if gone:
+                await s.execute(delete(GroupMember).where(GroupMember.chat_id == chat_id, GroupMember.user_id.in_(gone)))
+            if chosen is None:
                 return Result(False, "empty")
-            w = random.choice(pool)
             bond = random.randint(1, 100)
+            row = await s.get(WaifuPick, owner_id)
             if row:
-                row.waifu_id, row.bond, row.picked_at = w.id, bond, now
+                row.waifu_id, row.bond, row.picked_at = chosen.id, bond, now
             else:
-                await insert_ignore(s, WaifuPick, dict(user_id=owner_id, waifu_id=w.id, bond=bond, picked_at=now))
-            return Result(True, waifu_id=w.id, waifu_name=w.first_name, bond=bond, seconds_left=HOURS * 3600, fresh=True)
+                await insert_ignore(s, WaifuPick, dict(user_id=owner_id, waifu_id=chosen.id, bond=bond, picked_at=now))
+            return Result(True, waifu_id=chosen.id, waifu_name=chosen.first_name, bond=bond, seconds_left=HOURS * 3600, fresh=True)

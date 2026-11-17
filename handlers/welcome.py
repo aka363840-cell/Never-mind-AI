@@ -114,7 +114,11 @@ async def cm_leave(ev: ChatMemberUpdated, bot: Bot):
 
 @router.my_chat_member(ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
 async def added_to_group(ev: ChatMemberUpdated, bot: Bot):
-    """The bot itself was added to a group: introduce yourself."""
+    """The bot itself was added to a group: introduce yourself. (In a private chat this is someone starting / unblocking the bot.)"""
+    if ev.chat.type == "private":
+        from services import users
+        await users.mark_started(ev.chat.id)
+        return
     if ev.chat.type not in ("group", "supergroup"):
         return
     from services import users
@@ -140,7 +144,12 @@ async def added_to_group(ev: ChatMemberUpdated, bot: Bot):
 @router.my_chat_member(ChatMemberUpdatedFilter(member_status_changed=LEAVE_TRANSITION))
 async def removed_from_group(ev: ChatMemberUpdated) -> None:
     """The bot itself was kicked from, or left, a group. Flag it (never delete the row - its history stays)
-    so /stats can report 'groups removed' separately from groups we're still in, and broadcasts skip it."""
+    so /stats can report 'groups removed' separately from groups we're still in, and broadcasts skip it.
+    (In a private chat this is the person blocking the bot - flagged right away, no need to wait for a failed send.)"""
+    if ev.chat.type == "private":
+        from services import users
+        await users.mark_blocked(ev.chat.id)
+        return
     if ev.chat.type not in ("group", "supergroup"):
         return
     from services import users

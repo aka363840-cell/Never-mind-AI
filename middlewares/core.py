@@ -59,8 +59,11 @@ class ErrorMiddleware(BaseMiddleware):
             elif isinstance(event, Message):
                 await event.reply(str(e))
         except TelegramForbiddenError:
+            # Only a PRIVATE chat refusing us means "this person blocked the bot". In a group it just means the bot may
+            # not write there (muted, no rights...) - that says nothing about the user.
             uid = getattr(data.get("event_from_user"), "id", None)
-            if uid:
+            chat = data.get("event_chat")
+            if uid and chat is not None and chat.type == "private":
                 await users.mark_blocked(uid)
         except TelegramBadRequest as e:
             if "query is too old" in str(e) or "not modified" in str(e):
@@ -107,9 +110,10 @@ class CoreMiddleware(BaseMiddleware):
         if in_group:
             from services import events as _ev
             _ev.note_activity(event.chat.id)
+        if in_group and not event.left_chat_member:
+            await users.note_member(event.chat.id, tg.id)      # per-group roster /waifu picks from (commands count too)
         if in_group and not (event.text or "").startswith("/") and not (event.new_chat_members or event.left_chat_member):
             await users.note_seen(tg)          # remember who is in the group, so tagging them later always works
-            await users.note_member(event.chat.id, tg.id)      # ...and the per-group roster /waifu picks from
             # group chatter that isn't for the bot (no @mention / reply / its name): skip the rest of the DB work
             if "plain_mod" not in data and not addressed(event, await data["bot"].me())[0]:
                 return
@@ -128,6 +132,9 @@ class CoreMiddleware(BaseMiddleware):
                 await safe_answer(event)
                 return
         user = await users.touch(tg.id, tg.username, tg.full_name or tg.first_name)
+        _chat = data.get("event_chat")
+        if _chat is not None and _chat.type == "private" and user.started_dm is not True:
+            await users.mark_started(tg.id)            # they talked to the bot in private: we can DM them
         if user.is_banned:
             if isinstance(event, Message) and event.chat.type == "private":
                 await event.answer("🚫 Your account is suspended.")
