@@ -35,6 +35,7 @@ GROUP_MENU_EXTRA = ("ask", "settings")
 DESC_LIST: list[tuple[str, str]] = [
     ('start', '{emoji} Open the {name} menu'),
     ('sex', '💞 Ask someone for a cosy night in (they accept or reject); sometimes a cute baby appears (just for fun, not part of /family) 👶'),
+    ('whisper', '🤫 Private message in a group: type @bot <username/userid> <text> - only that person can read it'),
     ('afk', '😴 Go away: /afk [reason] - I tell people who tag you, and welcome you back when you write'),
     ('waifu', '🌸 Your Waifu of the Day: a random member of this group, the same one for 24h in every group (not family)'),
     ('help', '📖 Command guide'),
@@ -303,7 +304,7 @@ CATEGORIES: list[tuple[str, list[str]]] = [
                           "familytree", "addfamily", "unfamily", "roles", "gender", "familybonus", "ship",
                           "father", "mother", "brother", "sister", "@roles"]),
     ("🎭 Social & Fun", ["actions", "hug", "slap", "kiss", "compliment", "roast", "truth", "dare", "joke", "fact", "horoscope",
-                         "fortune", "iq", "lucky", "rate", "waifu", "afk", "sex", "@actions"]),
+                         "fortune", "iq", "lucky", "rate", "waifu", "afk", "sex", "whisper", "@actions"]),
     ("Academy 🎓", ["enroll", "academy", "schedule", "study", "attend", "hangout", "rest", "club", "parttime", "exam", "grades", "classrank",
                       "rival", "rivalduel", "crush", "crushoff", "campuscouple", "campusdate", "clubs", "buddy", "adventure", "academyremind", "reportcard", "halloffame", "academyhelp"]),
     ("🤖 AI Chat", ["ask"]),
