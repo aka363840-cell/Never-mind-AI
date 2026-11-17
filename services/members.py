@@ -49,9 +49,12 @@ async def full_scan(chat_id: int, check, admins=None, concurrency: int = 20) -> 
 
         await asyncio.gather(*(one(u) for u in cand))
         found = list(dict.fromkeys(found))
+        import time
+        from services import users
         async with db.tx() as s:
             for uid in found:
                 await insert_ignore(s, GroupMember, dict(chat_id=chat_id, user_id=uid))
+            await users.set_state(s, f"scan:{chat_id}", str(int(time.time())))      # remembered in the DB: a redeploy won't repeat it
         return len(cand), len(found)
     finally:
         _scanning.discard(chat_id)
@@ -71,3 +74,36 @@ async def auto_scan(bot, chat_id: int, force: bool = False) -> None:
         await full_scan(chat_id, lambda uid, strict=False: _still_here(bot, chat_id, uid, strict), lambda: _admins(bot, chat_id))
     except Exception:
         log.exception("auto scan failed for %s", chat_id)
+
+
+RESCAN_S = 7 * 86400
+
+
+async def scan_loop(bot) -> None:
+    """No commands needed: shortly after every start, and then every 30 minutes, any group that was never scanned (or not for a week)
+    is scanned - one group at a time. The time of the last scan is kept in the database, so a redeploy doesn't redo finished work."""
+    import time
+    from aiogram.exceptions import TelegramForbiddenError
+    from database.models import GroupSetting
+    from services import users
+    await asyncio.sleep(45)
+    while True:
+        try:
+            async with db.tx() as s:
+                groups = list((await s.execute(select(GroupSetting.chat_id).where(GroupSetting.removed == False))).scalars())  # noqa: E712
+            for cid in groups:
+                last = int(await users.get_state(f"scan:{cid}", "0") or 0)
+                if time.time() - last < RESCAN_S or scanning(cid):
+                    continue
+                try:
+                    await bot.get_chat(cid)                    # can I still reach this group at all?
+                except TelegramForbiddenError:
+                    await users.mark_group_removed(cid)
+                    continue
+                except Exception:
+                    continue
+                await auto_scan(bot, cid, force=True)
+                log.info("scanned members of group %s", cid)
+        except Exception:
+            log.exception("member scan loop error")
+        await asyncio.sleep(1800)

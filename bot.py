@@ -221,6 +221,11 @@ async def main() -> None:
              asyncio.create_task(announce.levelup_loop(bot)),
              asyncio.create_task(realm_loop(bot)), asyncio.create_task(housekeeping_loop()),
              asyncio.create_task(romance_loop(bot)), asyncio.create_task(academy_loop(bot))]
+    try:
+        from services import members as _members
+        tasks.append(asyncio.create_task(_members.scan_loop(bot)))          # finds everyone in every group, no commands needed
+    except Exception:
+        log.exception("could not start the member scan loop")
     if ai is not None:
         tasks.append(asyncio.create_task(_ai_selftest()))
     try:
