@@ -55,3 +55,19 @@ async def full_scan(chat_id: int, check, admins=None, concurrency: int = 20) -> 
         return len(cand), len(found)
     finally:
         _scanning.discard(chat_id)
+
+
+async def auto_scan(bot, chat_id: int, force: bool = False) -> None:
+    """Quiet background scan (no message in the chat). Runs when the bot joins a group, and again at most once a day in any group
+    where the bot knows fewer than 8 people - so nobody has to type /members scan."""
+    try:
+        from services.kv import kv
+        if scanning(chat_id):
+            return
+        if not force:
+            if await roster_size(chat_id) >= 8 or not await kv.set_nx(f"autoscan:{chat_id}", 86400):
+                return
+        from handlers.waifu import _admins, _still_here
+        await full_scan(chat_id, lambda uid, strict=False: _still_here(bot, chat_id, uid, strict), lambda: _admins(bot, chat_id))
+    except Exception:
+        log.exception("auto scan failed for %s", chat_id)

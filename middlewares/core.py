@@ -134,7 +134,9 @@ class CoreMiddleware(BaseMiddleware):
                 await users.note_member(event.chat.id, other.id)
             import asyncio as _aio
             from services import avatar as _av
-            _aio.create_task(_av.refresh_quietly(data["bot"], tg.id))      # keeps a profile picture on file (at most every 3 days)
+            _aio.create_task(_av.refresh_quietly(data["bot"], tg.id))
+            from services import members as _mem
+            _aio.create_task(_mem.auto_scan(data["bot"], event.chat.id))     # thin roster -> one quiet scan a day      # keeps a profile picture on file (at most every 3 days)
         if in_group and not (event.text or "").startswith("/") and not (event.new_chat_members or event.left_chat_member):
             await users.note_seen(tg)          # remember who is in the group, so tagging them later always works
             # group chatter that isn't for the bot (no @mention / reply / its name): skip the rest of the DB work

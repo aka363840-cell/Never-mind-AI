@@ -139,6 +139,9 @@ async def added_to_group(ev: ChatMemberUpdated, bot: Bot):
         await bot.send_message(ev.chat.id, text, reply_markup=kb([[B(text=f"{brand.EMOJI} Open menu in DM", url=brand.link("start=menu"))]]))
     except Exception:
         pass
+    import asyncio
+    from services import members
+    asyncio.create_task(members.auto_scan(bot, ev.chat.id, force=True))      # learn who is here right away, no command needed
 
 
 @router.my_chat_member(ChatMemberUpdatedFilter(member_status_changed=LEAVE_TRANSITION))
