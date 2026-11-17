@@ -8,7 +8,7 @@ from aiogram.types import Message
 
 from database.models import User
 from services import waifu as wf
-from utils.fmt import esc
+from utils.fmt import esc, mention
 
 router = Router()
 log = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ async def waifu_cmd(m: Message, bot: Bot, db_user: User):
         await m.reply("🌸 Use /waifu in a group — I pick your waifu of the day from its members." if r.reason == "group" else
                       "🌸 I haven't seen enough members in this group yet. Chat for a bit, then try /waifu again!")
         return
-    text = wf.caption(esc(db_user.first_name), esc(r.waifu_name), r.bond, r.seconds_left)
+    text = wf.caption(f"<b>{mention(db_user.id, db_user.first_name)}</b>", f"<b>{mention(r.waifu_id, r.waifu_name)}</b>", r.bond, r.seconds_left)
     try:
         photos = await bot.get_user_profile_photos(r.waifu_id, limit=1)
         if photos.total_count and photos.photos:

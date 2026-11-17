@@ -3,6 +3,8 @@ what the bot legitimately KNOWS: members it has seen (tracked in mod_members), p
 Every summary says exactly how many accounts that was; nothing pretends to cover "everybody"."""
 from __future__ import annotations
 
+import asyncio
+
 import time
 
 from aiogram import Bot
@@ -326,14 +328,26 @@ async def cmd_purge(m: Message, command: CommandObject, bot: Bot):
         await store.log_action(r.chat_id, r.actor, None, "purge", detail=f"{first}-{last}", source="manual")
         return
     await confirm.request(m, bot, "purge", {"first": first, "last": last}, title="MASS DELETE messages",
-                          lines=[f"🗑 Message ids <b>{first}</b> → <b>{last}</b> (about <b>{n}</b> messages, from everyone) will be deleted.", MSG_NOTE])
+                          lines=[f"🗑 About <b>{n}</b> messages (from everyone) will be deleted."])
+
+
+async def _vanish(ctx: Ctx, secs: int = 6) -> None:
+    """Tidy up: the short 'done' note removes itself, so the chat isn't left with a bot message after a clean-up."""
+    async def _go():
+        await asyncio.sleep(secs)
+        try:
+            await ctx.message.delete()
+        except Exception:
+            pass
+    asyncio.create_task(_go())
 
 
 async def _run_purge(ctx: Ctx) -> str:
     first, last = int(ctx.payload["first"]), int(ctx.payload["last"])
     done = await actions.delete_many(ctx.bot, ctx.chat_id, list(range(first, last + 1)))
     await store.log_action(ctx.chat_id, ctx.issuer, None, "purge", detail=f"{first}-{last} submitted={done}", source="bulk")
-    return f"🗑 Purge finished: <b>{done}</b> message ids were submitted for deletion and accepted by Telegram.\n" + MSG_NOTE
+    await _vanish(ctx)
+    return f"🗑 Done - {done} messages cleaned."
 
 
 confirm.register("purge", Spec(actor_right="delete", bot_right="delete", run=_run_purge))
@@ -341,25 +355,22 @@ confirm.register("purge", Spec(actor_right="delete", bot_right="delete", run=_ru
 
 @command("delall", cat="mass", usage="/delall <target>", desc="Delete every recent message (last ~48h that I tracked) of one member (asks YES/NO)")
 async def cmd_delall(m: Message, command: CommandObject, bot: Bot):
-    r = await prepare(m, command, bot, right="delete", target=True)
+    r = await prepare(m, command, bot, right="delete", target=True, allow_self=True, allow_admin_target=True)   # deleting messages is fine for yourself and other admins too
     msgs = await store.recent_msgs(r.chat_id, user_id=r.target, since=store.now() - 2 * 86400)
     if not msgs:
         raise ModError("ℹ️ I have no recent messages of that member on record (I only keep ~48 hours; Telegram offers no 'delete all by user' call).")
     await confirm.request(m, bot, "delall", {"uid": r.target}, title="DELETE all messages of one member",
-                          lines=[f"👤 {await r.who()}", f"🗑 <b>{len(msgs)}</b> tracked messages from the last 48 hours.", MSG_NOTE])
+                          lines=[f"👤 {await r.who()}", f"🗑 <b>{len(msgs)}</b> recent messages will be deleted."])
 
 
 async def _run_delall(ctx: Ctx) -> str:
     uid = int(ctx.payload["uid"])
-    st = await store.get_settings(ctx.chat_id)
-    why, _ = await perms.protection_reason(ctx.bot, ctx.chat_id, uid, st)
-    if why:
-        raise ModError(f"🛡 Not possible: the target is {why}.")
     ids = [x.message_id for x in await store.recent_msgs(ctx.chat_id, user_id=uid, since=store.now() - 2 * 86400)]
     done = await actions.delete_many(ctx.bot, ctx.chat_id, ids)
     await store.forget_msgs(ctx.chat_id, ids)
     await store.log_action(ctx.chat_id, ctx.issuer, uid, "delall", detail=f"submitted={done}/{len(ids)}", source="bulk")
-    return f"🗑 <b>{done}</b> of <b>{len(ids)}</b> tracked messages were deleted."
+    await _vanish(ctx)
+    return f"🗑 Done - {done} messages deleted."
 
 
 confirm.register("delall", Spec(actor_right="delete", bot_right="delete", run=_run_delall))

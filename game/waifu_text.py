@@ -18,10 +18,10 @@ def left_text(seconds: int) -> str:
 
 
 def caption(owner: str, waifu: str, bond: int, seconds_left: int) -> str:
-    """HTML caption. owner / waifu must already be HTML-escaped."""
-    return (f"✨ <b>{owner}'s Today's Waifu</b> ✨\n\n"
+    """HTML caption. owner / waifu are ready-made HTML (e.g. clickable mentions)."""
+    return (f"✨ {owner}'s Today's Waifu ✨\n\n"
             "╭──────────────\n"
-            f"┊ 💖 <b>{waifu}</b>\n"
+            f"┊ 💖 {waifu}\n"
             f"┊ 💗 Bond <b>{bond}%</b>  {bar(bond)}\n"
             f"┊ {tier(bond)}\n"
             "╰──────────────\n"
