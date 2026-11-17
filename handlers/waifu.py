@@ -25,8 +25,10 @@ async def _still_here(bot: Bot, chat_id: int, uid: int, strict: bool = False) ->
         except TelegramBadRequest:
             return False
         except Exception:
-            return not strict                                  # a hiccup is no reason to drop someone (but no reason to add one either)
-    return not strict
+            if attempt == 3:
+                return None if strict else True                # still unsure: strict callers (scans) get None = "ask again later"
+            await asyncio.sleep(1 + attempt)
+    return None if strict else True
 
 
 async def _admins(bot: Bot, chat_id: int) -> list[int]:

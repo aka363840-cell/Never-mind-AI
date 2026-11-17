@@ -24,59 +24,78 @@ async def roster_size(chat_id: int) -> int:
         return (await s.execute(select(func.count()).select_from(GroupMember).where(GroupMember.chat_id == chat_id))).scalar() or 0
 
 
-async def full_scan(chat_id: int, check, admins=None, concurrency: int = 20) -> tuple[int, int]:
-    """Check EVERY known, non-deleted player against this group. -> (checked, newly found). One scan per group at a time.
-    check(uid, strict) -> bool must retry on flood waits itself (handlers.waifu._still_here does)."""
+async def full_scan(chat_id: int, check, admins=None, concurrency: int = 20, since: float | None = None) -> tuple[int, int]:
+    """Check known players against this group. -> (checked, newly found). One scan per group at a time.
+    since=None: EVERYONE known; since=<unix time>: only players the bot got to know after that moment (the cheap daily top-up).
+    Progress is saved every 50 results, so a crash / redeploy mid-scan loses nothing. check(uid, strict) -> True / False / None
+    (None = Telegram hiccup: those people are asked again in a second pass instead of being skipped)."""
     if chat_id in _scanning:
         return 0, 0
     _scanning.add(chat_id)
     try:
+        from datetime import datetime, timezone
         async with db.tx() as s:
             have = set((await s.execute(select(GroupMember.user_id).where(GroupMember.chat_id == chat_id))).scalars())
-            cand = [i for i in (await s.execute(select(User.id).where(User.deleted_account == False, User.is_banned == False)  # noqa: E712
-                                                .order_by(User.last_seen.desc()))).scalars() if i not in have and i > 0]
-        found: list[int] = []
+            q = select(User.id).where(User.deleted_account == False, User.is_banned == False)  # noqa: E712
+            if since is not None:
+                q = q.where(User.created_at >= datetime.fromtimestamp(since, timezone.utc).replace(tzinfo=None))
+            cand = [i for i in (await s.execute(q.order_by(User.last_seen.desc()))).scalars() if i not in have and i > 0]
+        found_total = 0
+        buf: list[int] = []
+
+        async def flush() -> None:
+            nonlocal found_total, buf
+            if not buf:
+                return
+            out, buf = buf, []
+            async with db.tx() as s:
+                for uid in out:
+                    await insert_ignore(s, GroupMember, dict(chat_id=chat_id, user_id=uid))
+            found_total += len(out)
+
         try:
-            found += [a for a in (await admins() if admins else []) if a not in have]
+            buf += [a for a in (await admins() if admins else []) if a not in have]
         except Exception:
             pass
+        await flush()
         sem = asyncio.Semaphore(concurrency)
 
-        async def one(uid: int) -> None:
-            async with sem:
-                if await check(uid, True):
-                    found.append(uid)
+        async def sweep(ids: list[int]) -> list[int]:
+            unsure: list[int] = []
 
-        await asyncio.gather(*(one(u) for u in cand))
-        found = list(dict.fromkeys(found))
+            async def one(uid: int) -> None:
+                async with sem:
+                    r = await check(uid, True)
+                    if r:
+                        buf.append(uid)
+                        if len(buf) >= 50:
+                            await flush()
+                    elif r is None:
+                        unsure.append(uid)
+
+            await asyncio.gather(*(one(u) for u in ids))
+            await flush()
+            return unsure
+
+        unsure = await sweep(cand)
+        for _ in range(2):                                     # second / third look at everyone Telegram was unsure about
+            if not unsure:
+                break
+            await asyncio.sleep(5)
+            unsure = await sweep(unsure)
         import time
         from services import users
         async with db.tx() as s:
-            for uid in found:
-                await insert_ignore(s, GroupMember, dict(chat_id=chat_id, user_id=uid))
-            await users.set_state(s, f"scan:{chat_id}", str(int(time.time())))      # remembered in the DB: a redeploy won't repeat it
-        return len(cand), len(found)
+            now = str(int(time.time()))
+            await users.set_state(s, f"scan:{chat_id}", now)
+            if since is None:
+                await users.set_state(s, f"scanfull:{chat_id}", now)       # remembered in the DB: a redeploy won't repeat finished work
+        return len(cand), found_total
     finally:
         _scanning.discard(chat_id)
 
 
-async def auto_scan(bot, chat_id: int, force: bool = False) -> None:
-    """Quiet background scan (no message in the chat). Runs when the bot joins a group, and again at most once a day in any group
-    where the bot knows fewer than 8 people - so nobody has to type /members scan."""
-    try:
-        from services.kv import kv
-        if scanning(chat_id):
-            return
-        if not force:
-            if await roster_size(chat_id) >= 8 or not await kv.set_nx(f"autoscan:{chat_id}", 86400):
-                return
-        from handlers.waifu import _admins, _still_here
-        await full_scan(chat_id, lambda uid, strict=False: _still_here(bot, chat_id, uid, strict), lambda: _admins(bot, chat_id))
-    except Exception:
-        log.exception("auto scan failed for %s", chat_id)
-
-
-RESCAN_S = 7 * 86400
+FULL_EVERY, TOPUP_EVERY = 7 * 86400, 86400
 
 
 async def scan_loop(bot) -> None:
@@ -92,9 +111,12 @@ async def scan_loop(bot) -> None:
             async with db.tx() as s:
                 groups = list((await s.execute(select(GroupSetting.chat_id).where(GroupSetting.removed == False))).scalars())  # noqa: E712
             for cid in groups:
+                now = time.time()
+                full = int(await users.get_state(f"scanfull:{cid}", "0") or 0)
                 last = int(await users.get_state(f"scan:{cid}", "0") or 0)
-                if time.time() - last < RESCAN_S or scanning(cid):
+                if scanning(cid) or (now - full < FULL_EVERY and now - last < TOPUP_EVERY):
                     continue
+                since = None if now - full >= FULL_EVERY else float(last)        # weekly: everyone; daily: only players new to the bot
                 try:
                     await bot.get_chat(cid)                    # can I still reach this group at all?
                 except TelegramForbiddenError:
@@ -102,7 +124,7 @@ async def scan_loop(bot) -> None:
                     continue
                 except Exception:
                     continue
-                await auto_scan(bot, cid, force=True)
+                await auto_scan(bot, cid, force=True, since=since)
                 log.info("scanned members of group %s", cid)
         except Exception:
             log.exception("member scan loop error")
