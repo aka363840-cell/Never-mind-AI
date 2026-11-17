@@ -176,7 +176,8 @@ class Rules:
     xp_win: int = 25
     xp_loss: int = 8
     protect_cost_per_hour: int = 125     # /protect 1h, 2h, 3h ... costs hours x this
-    protect_max_hours: int = 24
+    protect_max_hours: int = 12
+    protect_exposed_s: int = 2 * 3600    # after a shield ends you can't re-shield (or be Guardian-shielded) for this long: nobody is unkillable forever
     revenge_window_s: int = 1800
     revenge_cooldown_s: int = 0
     revenge_attack_bonus: float = 0.10

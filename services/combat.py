@@ -79,6 +79,12 @@ async def protection_left(s: AsyncSession, uid: int) -> int:
 
 
 async def grant_protection(s: AsyncSession, uid: int, seconds: int) -> None:
+    old = (await s.execute(select(Protection.expires_at).where(Protection.user_id == uid))).scalar()
+    if old is not None:
+        wait = int((aware(old) + timedelta(seconds=R.protect_exposed_s) - utcnow()).total_seconds())
+        if wait > 0:                                 # shield just ended: a short window where it can be attacked
+            from utils.fmt import dur
+            raise GameError(f"⏳ A shield just ended - protection can't be bought again for another <b>{dur(wait)}</b>.")
     exp = utcnow() + timedelta(seconds=seconds)
     res = await s.execute(update(Protection).where(Protection.user_id == uid).values(expires_at=exp, last_activated_at=utcnow()))
     if res.rowcount == 0:

@@ -164,6 +164,7 @@ def _rule_rob() -> str:
 def _rule_protect() -> str:
     return (f"🛡 <b>Protection, death and revive</b>\n{DIV}\n"
             f"• <code>/protect 2h</code> shields you from /kill and /rob. Costs <b>{R.protect_cost_per_hour} 💎 per hour</b>, up to {R.protect_max_hours}h.\n"
+            f"• After a shield ends there is a <b>{dur(R.protect_exposed_s)}</b> gap before you can buy another, so nobody stays unkillable.\n"
             f"• Attacking someone drops your own protection.\n• You can't buy more while one is running.\n\n"
             f"💀 <b>Dead?</b> You can't kill, rob or duel. <code>/revive</code> costs {R.revive_cost} 💎 from your wallet, then you are immune for {dur(R.kill_victim_immunity_s)}.\n\n"
             f"🏦 <b>Safest place:</b> the bank. Kills and robberies only take from the wallet.")
