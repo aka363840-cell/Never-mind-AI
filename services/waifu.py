@@ -30,9 +30,54 @@ class Result:
     fresh: bool = False                        # picked just now (False = the existing pick for the day)
 
 
-async def pick(owner_id: int, chat_id: int | None, check=None) -> Result:
-    """check: optional async callable uid -> bool ("is this person still in the group?"). Candidates are tried in random
-    order until one passes; the ones that don't are dropped from this group's roster."""
+THIN = 8            # fewer known members than this -> try to discover more
+SCAN = 200          # how many recently-active known players one scan checks
+SCAN_EVERY = 6 * 3600
+
+
+async def _pool(s, chat_id: int, owner_id: int) -> list[User]:
+    ids = set((await s.execute(select(GroupMember.user_id).where(GroupMember.chat_id == chat_id))).scalars())
+    ids |= set((await s.execute(select(GroupStat.user_id).where(GroupStat.chat_id == chat_id))).scalars())   # players seen before the roster existed
+    ids.discard(owner_id)
+    if not ids:
+        return []
+    return list((await s.execute(select(User).where(User.id.in_(ids), User.is_banned == False,  # noqa: E712
+                                                     User.deleted_account == False))).scalars())   # noqa: E712
+
+
+async def _discover(chat_id: int, owner_id: int, check, admins) -> None:
+    """Telegram gives bots no member list, so find members the other way round: ask getChatMember about the players this bot
+    already knows (most recently active first) and about the group's admins, and keep everyone who is really in this group."""
+    from services.kv import kv
+    if not await kv.set_nx(f"wscan:{chat_id}", SCAN_EVERY):        # at most one scan per group every few hours
+        return
+    async with db.tx() as s:
+        have = set((await s.execute(select(GroupMember.user_id).where(GroupMember.chat_id == chat_id))).scalars())
+        cand = [i for i in (await s.execute(select(User.id).where(User.is_banned == False, User.deleted_account == False,  # noqa: E712
+                                                                 User.id != owner_id).order_by(User.last_seen.desc()).limit(SCAN))).scalars()
+                if i not in have]
+    found: list[int] = []
+    sem = asyncio.Semaphore(15)
+
+    async def one(uid: int) -> None:
+        async with sem:
+            if await check(uid, True):          # strict: any error counts as "not a member"
+                found.append(uid)
+
+    try:
+        found += [a for a in (await admins() if admins else []) if a != owner_id]
+    except Exception:
+        pass
+    await asyncio.gather(*(one(u) for u in cand))
+    async with db.tx() as s:
+        for uid in dict.fromkeys(found):
+            await insert_ignore(s, GroupMember, dict(chat_id=chat_id, user_id=uid))
+
+
+async def pick(owner_id: int, chat_id: int | None, check=None, admins=None) -> Result:
+    """check: optional async callable (uid, strict) -> bool ("is this person in the group?"; strict=True treats errors as no).
+    admins: optional async callable -> list of the group's human admin ids. Candidates are tried in random order until one
+    passes; the ones that don't are dropped from this group's roster. A thin roster triggers a discovery scan (_discover)."""
     lock = _locks.setdefault(owner_id, asyncio.Lock())
     async with lock:
         now = utcnow()
@@ -44,21 +89,19 @@ async def pick(owner_id: int, chat_id: int | None, check=None) -> Result:
                 return Result(True, waifu_id=row.waifu_id, waifu_name=w.first_name if w else "Someone", bond=row.bond, seconds_left=left)
             if chat_id is None:
                 return Result(False, "group")
-            ids = set((await s.execute(select(GroupMember.user_id).where(GroupMember.chat_id == chat_id))).scalars())
-            ids |= set((await s.execute(select(GroupStat.user_id).where(GroupStat.chat_id == chat_id))).scalars())   # players seen before the roster existed
-            ids.discard(owner_id)
-            pool: list[User] = []
-            if ids:
-                pool = list((await s.execute(select(User).where(User.id.in_(ids), User.is_banned == False,  # noqa: E712
-                                                                 User.deleted_account == False))).scalars())   # noqa: E712
+            pool = await _pool(s, chat_id, owner_id)
             prev = row.waifu_id if row else None
+        if check is not None and len(pool) < THIN:
+            await _discover(chat_id, owner_id, check, admins)
+            async with db.tx() as s:
+                pool = await _pool(s, chat_id, owner_id)
         random.shuffle(pool)
         if prev is not None and len(pool) > 1:
             pool.sort(key=lambda u: u.id == prev)                       # the previous waifu goes last: a fresh face when there is one
         chosen = None
         gone: list[int] = []
         for u in pool[:15]:
-            if check is None or await check(u.id):                       # network calls happen outside the DB transaction
+            if check is None or await check(u.id, False):                       # network calls happen outside the DB transaction
                 chosen = u
                 break
             gone.append(u.id)
