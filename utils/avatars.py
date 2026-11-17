@@ -82,3 +82,36 @@ async def fetch(bot, user_ids) -> dict[int, bytes]:
         _cache.clear()
         _cache.update(dict(sorted(live.items(), key=lambda kv: kv[1][0])[-MAX_CACHE // 2:]))
     return out
+
+
+def initial_card(name: str, size: int = 640) -> bytes:
+    """A clean picture with the person's first letter, used when they have no (visible) profile photo."""
+    from PIL import Image, ImageDraw, ImageFont
+    seed = sum(ord(c) for c in name) or 1
+    palette = [((255, 154, 158), (250, 208, 196)), ((161, 140, 209), (251, 194, 235)), ((132, 250, 176), (143, 211, 244)),
+               ((255, 195, 113), (255, 95, 109)), ((102, 166, 255), (137, 247, 254)), ((246, 211, 101), (253, 160, 133))]
+    c1, c2 = palette[seed % len(palette)]
+    im = Image.new("RGB", (size, size))
+    px = im.load()
+    for y in range(size):
+        for x in range(size):
+            t = (x + y) / (2 * size)
+            px[x, y] = tuple(int(c1[i] + (c2[i] - c1[i]) * t) for i in range(3))
+    letter = next((ch for ch in name.strip() if ch.isalnum()), "?").upper()
+    font = None
+    base = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "fonts")
+    for f in ("Poppins-Bold.ttf", "FreeSansBold.ttf"):
+        try:
+            font = ImageFont.truetype(os.path.join(base, f), int(size * 0.5))
+            break
+        except Exception:
+            continue
+    font = font or ImageFont.load_default()
+    d = ImageDraw.Draw(im)
+    try:
+        d.text((size / 2, size / 2), letter, font=font, fill=(255, 255, 255), anchor="mm")
+    except Exception:
+        d.text((size / 3, size / 3), letter, fill=(255, 255, 255))
+    buf = io.BytesIO()
+    im.save(buf, "JPEG", quality=88)
+    return buf.getvalue()

@@ -1,8 +1,9 @@
 """/waifu - see services/waifu.py. Pure fun: no wallets, no family, no marriage."""
+import asyncio
 import logging
 
 from aiogram import Bot, Router
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.exceptions import TelegramBadRequest, TelegramRetryAfter
 from aiogram.filters import Command
 from aiogram.types import Message
 
@@ -15,17 +16,65 @@ log = logging.getLogger(__name__)
 
 
 async def _still_here(bot: Bot, chat_id: int, uid: int, strict: bool = False) -> bool:
-    try:
-        mem = await bot.get_chat_member(chat_id, uid)
-        return mem.status in ("member", "administrator", "creator") or (mem.status == "restricted" and getattr(mem, "is_member", True))
-    except TelegramBadRequest:
-        return False
-    except Exception:
-        return not strict                                      # a hiccup is no reason to drop someone (but no reason to add one either)
+    for attempt in range(4):
+        try:
+            mem = await bot.get_chat_member(chat_id, uid)
+            return mem.status in ("member", "administrator", "creator") or (mem.status == "restricted" and getattr(mem, "is_member", True))
+        except TelegramRetryAfter as e:                        # flood wait: wait it out instead of wrongly saying "not a member"
+            await asyncio.sleep(min(e.retry_after, 30) + 0.5)
+        except TelegramBadRequest:
+            return False
+        except Exception:
+            return not strict                                  # a hiccup is no reason to drop someone (but no reason to add one either)
+    return not strict
 
 
 async def _admins(bot: Bot, chat_id: int) -> list[int]:
-    return [a.user.id for a in await bot.get_chat_administrators(chat_id) if not a.user.is_bot]
+    """The group's human admins. They are also registered (name + username), otherwise they could not be picked."""
+    from services import users
+    out = []
+    for a in await bot.get_chat_administrators(chat_id):
+        if a.user.is_bot:
+            continue
+        out.append(a.user.id)
+        try:
+            await users.touch(a.user.id, a.user.username, a.user.full_name or a.user.first_name)
+        except Exception:
+            pass
+    return out
+
+
+async def _empty_hint(bot: Bot, m: Message) -> str:
+    """Why nobody could be picked, and the exact fix."""
+    try:
+        me = await bot.get_me()
+        blind = not me.can_read_all_group_messages
+        admin = (await bot.get_chat_member(m.chat.id, me.id)).status == "administrator"
+    except Exception:
+        blind, admin = False, True
+    if blind and not admin:
+        return ("🌸 I can't see this group's messages, so I don't know its members yet.\n"
+                "👉 Make me a group <b>admin</b> (or turn off Group Privacy in BotFather: /setprivacy → Disable), then send /members scan.")
+    return "🌸 I don't know enough members of this group yet. An admin can send <b>/members scan</b> to look everyone up."
+
+
+async def _send_card(m: Message, bot: Bot, uid: int, name: str, text: str) -> None:
+    """The waifu's profile photo; else the last photo we ever saw of them; else a clean initials picture. Always a picture."""
+    from aiogram.types import BufferedInputFile
+    from services import avatar
+    from utils import avatars
+    fid = await avatar.best(bot, uid)
+    if fid:
+        try:
+            await m.reply_photo(fid, caption=text)
+            return
+        except Exception:
+            log.info("remembered photo for %s no longer works", uid)
+    try:
+        await m.reply_photo(BufferedInputFile(avatars.initial_card(name), "waifu.jpg"), caption=text)
+    except Exception:
+        log.exception("initials card failed")
+        await m.reply(text)
 
 
 @router.message(Command("waifu"))
@@ -41,14 +90,7 @@ async def waifu_cmd(m: Message, bot: Bot, db_user: User):
                       (lambda: _admins(bot, m.chat.id)) if in_group else None)
     if not r.ok:
         await m.reply("🌸 Use /waifu in a group — I pick your waifu of the day from its members." if r.reason == "group" else
-                      "🌸 I haven't seen enough members in this group yet. Chat for a bit, then try /waifu again!")
+                      await _empty_hint(bot, m))
         return
     text = wf.caption(f"<b>{mention(db_user.id, db_user.first_name)}</b>", f"<b>{mention(r.waifu_id, r.waifu_name)}</b>", r.bond, r.seconds_left)
-    try:
-        photos = await bot.get_user_profile_photos(r.waifu_id, limit=1)
-        if photos.total_count and photos.photos:
-            await m.reply_photo(photos.photos[0][-1].file_id, caption=text)
-            return
-    except Exception:
-        log.info("no profile photo for %s", r.waifu_id)      # privacy settings / no photo: fall back to text only
-    await m.reply(text)
+    await _send_card(m, bot, r.waifu_id, r.waifu_name, text)

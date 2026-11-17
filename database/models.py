@@ -277,6 +277,15 @@ class Afk(Base):
     since: Mapped[datetime] = mapped_column(TS, default=utcnow)
 
 
+class AvatarCache(Base):
+    """Last profile-photo file id the bot could see for a person. Telegram hides some photos (privacy) or a lookup fails at the
+    wrong moment; the remembered one keeps /waifu (and others) working. Lives in the DB, so backups keep it."""
+    __tablename__ = "avatar_cache"
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    file_id: Mapped[str] = mapped_column(String(255))
+    checked_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+
+
 class WaifuPick(Base):
     """/waifu: one row per player = their current pick. Entirely separate from marriages / relations / family."""
     __tablename__ = "waifu_picks"

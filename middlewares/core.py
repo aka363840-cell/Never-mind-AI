@@ -47,6 +47,22 @@ async def _command_allowed(uid: int, event: Message) -> bool:
     return True
 
 
+def _others(m: Message) -> list:
+    """Other real people a group message points at: the replied-to author, @-text-mentions, the forwarded-from user."""
+    out = {}
+    r = m.reply_to_message
+    if r and r.from_user and not r.from_user.is_bot and r.sender_chat is None:
+        out[r.from_user.id] = r.from_user
+    for e in (m.entities or m.caption_entities or []):
+        if e.type == "text_mention" and e.user and not e.user.is_bot:
+            out[e.user.id] = e.user
+    fo = getattr(m, "forward_origin", None)
+    fu = getattr(fo, "sender_user", None)
+    if fu and not fu.is_bot:
+        out[fu.id] = fu
+    return [u for uid, u in out.items() if uid != getattr(m.from_user, "id", None)]
+
+
 class ErrorMiddleware(BaseMiddleware):
     """Turns expected GameErrors into friendly replies; never leaks internals."""
 
@@ -112,6 +128,13 @@ class CoreMiddleware(BaseMiddleware):
             _ev.note_activity(event.chat.id)
         if in_group and not event.left_chat_member:
             await users.note_member(event.chat.id, tg.id)      # per-group roster /waifu picks from (commands count too)
+        if in_group:
+            for other in _others(event):                       # also: who was replied to / tagged / forwarded - they are in this group too
+                await users.note_seen(other)
+                await users.note_member(event.chat.id, other.id)
+            import asyncio as _aio
+            from services import avatar as _av
+            _aio.create_task(_av.refresh_quietly(data["bot"], tg.id))      # keeps a profile picture on file (at most every 3 days)
         if in_group and not (event.text or "").startswith("/") and not (event.new_chat_members or event.left_chat_member):
             await users.note_seen(tg)          # remember who is in the group, so tagging them later always works
             # group chatter that isn't for the bot (no @mention / reply / its name): skip the rest of the DB work

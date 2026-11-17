@@ -31,7 +31,7 @@ class Result:
 
 
 THIN = 8            # fewer known members than this -> try to discover more
-SCAN = 200          # how many recently-active known players one scan checks
+SCAN = 600          # how many recently-active known players one scan checks
 SCAN_EVERY = 6 * 3600
 
 
