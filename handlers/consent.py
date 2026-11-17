@@ -58,6 +58,25 @@ BABY_LINES = ["👶 <b>A cute baby arrives!</b> It's a <b>{g}</b> {e} - tiny fin
 NO_BABY = ["🌙 Sweet night, but no baby this time. Maybe next time! 💭", "💤 No little one this time - just happy memories.", "🕊 No baby this time. Rest up and try again later 💞"]
 
 
+_baby_file_id: str | None = None
+
+
+async def _baby_photo(m: Message, caption: str) -> bool:
+    """Cute baby picture (assets/baby.jpg) with the caption; Telegram's file id is remembered so it uploads only once."""
+    global _baby_file_id
+    try:
+        from pathlib import Path
+        from aiogram.types import FSInputFile
+        src = _baby_file_id or FSInputFile(Path(__file__).resolve().parent.parent / "assets" / "baby.jpg")
+        sent = await m.answer_photo(src, caption=caption[:1000])
+        if sent.photo:
+            _baby_file_id = sent.photo[-1].file_id
+        return True
+    except Exception:
+        log.exception("baby photo failed - sending text")
+        return False
+
+
 def _kb(token: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[B(text="✅ Accept", callback_data=f"cn:{token}:y"), B(text="❌ Reject", callback_data=f"cn:{token}:n")]])
 
@@ -136,12 +155,19 @@ async def answer(cb: CallbackQuery, bot: Bot):
             await cb.message.answer(text)
         return
     text = f"{emoji} " + random.choice(yes).format(a=a, b=b)
+    photo = False
     if d["act"] == "sex":
-        if random.random() < BABY_CHANCE:
-            g, e = random.choice([("baby girl", "👧"), ("baby boy", "👦")])
-            text = text.rstrip() + "\n\n👶👶👶\n" + random.choice(BABY_LINES).format(a=a, b=b, g=g, e=e)
+        from services import life
+        outcome, kid, g = await life.sex_baby(d["a"], d["b"])
+        if outcome == "born":
+            gl, ge = ("baby girl", "👧") if g == "g" else ("baby boy", "👦")
+            text += "\n\n" + random.choice(BABY_LINES).format(a=a, b=b, g=f"{gl} named {esc(kid)}", e=ge) + "\n👨‍👩‍👧 Added to both families - see /family"
+            photo = True
         else:
-            text = text.rstrip() + "\n\n" + random.choice(NO_BABY)
+            text += "\n\n" + {"none": random.choice(NO_BABY),
+                              "full": "👨‍👩‍👧‍👦 No baby: one of you already has a full family (6 children).",
+                              "cooldown": "⏳ No baby this time - too soon after the last one (12h break).",
+                              "poor": f"💸 No baby this time - a baby costs {life.BABY_COST:,} 💎 from {a}'s wallet."}[outcome]
     try:
         await cb.message.delete()
     except Exception:
@@ -149,6 +175,8 @@ async def answer(cb: CallbackQuery, bot: Bot):
             await cb.message.edit_reply_markup(reply_markup=None)
         except Exception:
             pass
+    if photo and await _baby_photo(cb.message, text):
+        return
     if gif and gif in gifs.GIF_ACTIONS:
         await gifs.send(cb.message, gif, text)
     else:
