@@ -206,6 +206,8 @@ async def main() -> None:
             log.error("AI self-test crashed: %s", e)
 
     bot = Bot(st.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    from utils.replyfix import ReplyFallbackMiddleware
+    bot.session.middleware(ReplyFallbackMiddleware())            # command deleted by another bot / admin -> still answer
     bot.session.middleware(btn_style.ButtonStyleMiddleware())     # colours + premium icons on every inline keyboard
     try:
         await btn_style.load_packs(bot)                           # default premium emoji packs
