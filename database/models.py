@@ -277,6 +277,14 @@ class Afk(Base):
     since: Mapped[datetime] = mapped_column(TS, default=utcnow)
 
 
+class WhisperRecent(Base):
+    """Who each person whispered to lately, so they can pick them from a list instead of typing the name / id again."""
+    __tablename__ = "whisper_recent"
+    sender_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    target_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    last_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+
+
 class AvatarCache(Base):
     """Last profile-photo file id the bot could see for a person. Telegram hides some photos (privacy) or a lookup fails at the
     wrong moment; the remembered one keeps /waifu (and others) working. Lives in the DB, so backups keep it."""
