@@ -84,7 +84,7 @@ async def whisper_inline(iq: InlineQuery):
 
 
 @router.callback_query(F.data.startswith("wh:"))
-async def whisper_open(cb: CallbackQuery):
+async def whisper_open(cb: CallbackQuery, bot: Bot):
     raw = await kv.get(f"wh:{cb.data[3:]}")
     if raw is None:
         return await cb.answer("⌛ This whisper has expired.", show_alert=True)
@@ -94,6 +94,12 @@ async def whisper_open(cb: CallbackQuery):
     if not ok:
         return await cb.answer("🔒 This whisper isn't for you.", show_alert=True)
     await cb.answer(f"🤫 {d['sn']}:\n\n{d['t']}"[:200], show_alert=True)
+    if me.id != d["s"] and cb.inline_message_id and await kv.set_nx(f"whr:{cb.data[3:]}", TTL):     # first time the TARGET opens it
+        try:
+            await bot.edit_message_text(f"👀 <b>{mention(me.id, me.full_name)} read the whisper!</b>", inline_message_id=cb.inline_message_id,
+                                        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[B(text="🔓 Read again", callback_data=cb.data)]]))
+        except Exception:
+            log.info("could not mark the whisper as read")
 
 
 @router.message(Command("whisper"))
