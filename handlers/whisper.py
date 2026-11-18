@@ -13,7 +13,7 @@ from aiogram.types import (CallbackQuery, InlineKeyboardButton as B, InlineKeybo
 
 from services.kv import kv
 from utils import brand
-from utils.fmt import esc
+from utils.fmt import esc, mention
 
 log = logging.getLogger(__name__)
 router = Router()
@@ -24,6 +24,23 @@ TTL = 7 * 86400
 def _usage() -> str:
     return (f"🔒 <b>Whisper</b>\nType in any chat:\n<code>@{esc(brand.username() or 'bot')} &lt;username/userid&gt; &lt;your whisper text&gt;</code>\n\n"
             "Only that person can read it, even in a group. 🤫")
+
+
+async def _lookup(who: str) -> tuple[int | None, str | None]:
+    """(user id, first name) when the bot knows this person, else (id if numeric, None)."""
+    from sqlalchemy import select
+    from database.models import User
+    from database.session import db
+    try:
+        async with db.tx() as s:
+            q = select(User.id, User.first_name).where(User.id == int(who)) if who.isdigit() else \
+                select(User.id, User.first_name).where(User.username_lc == who.lower())
+            row = (await s.execute(q)).first()
+        if row:
+            return row[0], (row[1] or None)
+    except Exception:
+        log.exception("whisper lookup failed")
+    return (int(who) if who.isdigit() else None), None
 
 
 def parse(q: str) -> tuple[str, str] | None:
@@ -47,11 +64,20 @@ async def whisper_inline(iq: InlineQuery):
         return await iq.answer([r], cache_time=0, is_personal=True)
     who, text = p
     token = hashlib.sha256(f"{iq.from_user.id}:{who.lower()}:{text}".encode()).hexdigest()[:16]
-    await kv.put(f"wh:{token}", json.dumps({"s": iq.from_user.id, "sn": iq.from_user.full_name, "w": who.lower(), "t": text}), TTL)
-    target = f'<a href="tg://user?id={who}">this person</a>' if who.isdigit() else f"@{esc(who)}"
-    msg = (f"🔒 <b>A whisper for {target}</b>\n<i>from {esc(iq.from_user.full_name)} · only they can read it</i>")
+    tid, tname = await _lookup(who)
+    await kv.put(f"wh:{token}", json.dumps({"s": iq.from_user.id, "sn": iq.from_user.full_name, "w": str(tid) if tid else who.lower(), "t": text}), TTL)
+    if tid and tname:                                    # priority: Name > @username > user id
+        target = mention(tid, tname)
+        label = tname
+    elif who.isdigit():
+        target = f'<a href="tg://user?id={who}">{who}</a>'
+        label = who
+    else:
+        target = f"@{esc(who)}"
+        label = "@" + who
+    msg = f"🔒 <b>A whisper message to {target}</b>\nOnly they can read the message."
     r = InlineQueryResultArticle(
-        id=token, title=f"🔒 Whisper to {'@' + who if not who.isdigit() else who}", description=text[:60],
+        id=token, title=f"🔒 Whisper to {label}", description=text[:60],
         input_message_content=InputTextMessageContent(message_text=msg),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[B(text="🔓 Show whisper", callback_data=f"wh:{token}")]]))
     await iq.answer([r], cache_time=0, is_personal=True)
