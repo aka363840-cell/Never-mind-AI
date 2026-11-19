@@ -66,10 +66,11 @@ class Stack:
     """Inter first, then FreeSans (Hindi, Cyrillic, Greek...). Characters no font can draw are dropped instead of showing boxes."""
 
     def __init__(self, main: str, size: int):
-        self.fonts = [_font(main, size), _font("FreeSans.ttf", size)]
+        # Inter first; then fonts that carry fancy letters (𝑷𝒊𝒚𝒖𝒔𝒉 𝕬 𝓐 ♡ ✨ ★), Hindi, Cyrillic, Greek, symbols
+        self.fonts = [_font(main, size)] + [_font(f, size) for f in ("FreeSans.ttf", "FreeSerif.ttf", "DejaVuMathTeXGyre.ttf", "DejaVuSans.ttf")]
 
     def clean(self, text: str) -> str:
-        text = _EMOJI.sub("", unicodedata.normalize("NFKC", text))          # NFKC turns fancy letters like 𝑷𝒊𝒚𝒖𝒔𝒉 into plain ones
+        text = text.replace("\ufe0f", "").replace("\u200d", "").replace("\u20e3", "")        # invisible emoji glue only; the text stays EXACTLY as written
         return "".join(c for c in text if c == "\n" or (c.isprintable() and any(_has(f, c) for f in self.fonts)))
 
     def _f(self, ch: str):
@@ -129,7 +130,7 @@ def _circle(av: bytes | None, name: str, size: int, tint) -> Image.Image:
     if im is None:
         im = Image.new("RGB", (size, size), tint)
         d = ImageDraw.Draw(im)
-        ch = next((c for c in unicodedata.normalize("NFKC", name) if c.isalnum() and _has(_font("Poppins-Bold.ttf", 40), c)), "?").upper()
+        ch = next((c for c in unicodedata.normalize("NFKC", name) if c.isalnum() and _has(_font("Poppins-Bold.ttf", 40), c)), "?").upper()   # (only the avatar letter is simplified)
         d.text((size / 2, size / 2), ch, font=_font("Poppins-Bold.ttf", int(size * .5)), fill=(255, 255, 255), anchor="mm")
     mask = Image.new("L", (size * 4, size * 4), 0)
     ImageDraw.Draw(mask).ellipse((0, 0, size * 4 - 1, size * 4 - 1), fill=255)
@@ -158,7 +159,8 @@ def render(items: list[dict], bg: tuple[int, int, int] | None = None, reply: dic
             lines = lines[:max(1, budget)]
             lines[-1] = lines[-1][:-1].rstrip() + "…"
         budget = max(1, budget - len(lines))
-        blocks.append((it, lines, it["name"] != prev_name))
+        nlines = _wrap(probe, it["name"], f_n, tw - 2 * 26)[:3]
+        blocks.append((it, lines, it["name"] != prev_name, nlines))
         prev_name = it["name"]
     rep_lines = []
     if reply:
@@ -169,9 +171,9 @@ def render(items: list[dict], bg: tuple[int, int, int] | None = None, reply: dic
         rh = 34 + 38 * len(rep_lines) + 22
         layout.append(("reply", h, rh))
         h += rh + 14
-    for it, lines, head in blocks:
-        bh = 26 * 2 + 52 * len(lines) + (46 if head else 0)
-        layout.append(("msg", h, bh, it, lines, head))
+    for it, lines, head, nlines in blocks:
+        bh = 26 * 2 + 52 * len(lines) + (46 * len(nlines) if head else 0)
+        layout.append(("msg", h, bh, it, lines, head, nlines))
         h += bh + 14
     h += PAD - 14
     bubble = tuple(min(255, int(c * 1.0)) for c in bg)
@@ -184,19 +186,22 @@ def render(items: list[dict], bg: tuple[int, int, int] | None = None, reply: dic
             _, y, rh = ent
             d.rounded_rectangle((x0, y, W - PAD, y + rh), radius=26, fill=bubble + (150,))
             d.rectangle((x0 + 14, y + 16, x0 + 20, y + rh - 16), fill=sub)
-            f_s.draw(d, (x0 + 38, y + 14), f_s.clean(reply["name"])[:28] or "User", fg)
+            f_s.draw(d, (x0 + 38, y + 14), (f_s.clean(reply["name"]) or "User")[:40], fg)
             for i, ln in enumerate(rep_lines):
                 f_s.draw(d, (x0 + 38, y + 14 + 38 * (i + 1)), ln, sub)
             continue
-        _, y, bh, it, lines, head = ent
+        _, y, bh, it, lines, head, nlines = ent
         d.rounded_rectangle((x0, y, W - PAD, y + bh), radius=34, fill=bubble + (255,))
         ty = y + 26
         if head:
             col = pal[sum(map(ord, it["name"])) % len(pal)]
             if _lum(bg) > .6:
                 col = tuple(int(c * .6) for c in col)
-            f_n.draw(d, (x0 + 26, ty), it["name"][:30], col)
-            ty += 46
+            if abs(_lum(col) - _lum(bg)) < .28:          # name colour too close to the bubble colour: use the plain text colour
+                col = fg
+            for nl in nlines:
+                f_n.draw(d, (x0 + 26, ty), nl, col)
+                ty += 46
             im.alpha_composite(_circle(it.get("avatar"), it["name"], AV, col), (PAD, y))
         for ln in lines:
             f_t.draw(d, (x0 + 26, ty), ln, fg)
