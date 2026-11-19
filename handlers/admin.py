@@ -50,7 +50,7 @@ async def _ask(m: Message, action: str, args: dict, summary: str):
 
 @router.message(Command("admin"))
 async def admin_help(m: Message):
-    await m.reply("🔧 <b>Admin</b> (" + adm.role(m.from_user.id) + ")\n/give /take /setbalance &lt;target&gt; &lt;amount&gt;\n"
+    await m.reply("🔧 <b>Admin</b> (" + adm.role(m.from_user.id) + ")\n/give /take /setbalance &lt;target&gt; &lt;amount&gt;\n/resetdiamonds &lt;amount&gt; (everyone's wallet = amount, owner)\n"
                   "/ban &lt;target&gt; [reason] · /unban · /mute · /unmute  (owner: no slash needed — reply with \"ban\" / \"mute\" / \"unban\")\n/userinfo &lt;target&gt; · /logs [n]\n"
                   "/broadcast &lt;text&gt; · /syncusers · /maintenance on|off · /stats · /backupdb · /restoredb · /emojiid · /seticon · /delicon · /aitest (owner) · /drop · /boss (in groups)\n\nTarget = reply, @user or ID. Works in DM and in groups. State changes need a confirm tap.")
 
@@ -129,6 +129,19 @@ async def balance_cmds(m: Message, command: CommandObject):
         raise GameError(f"Usage: /{action} &lt;target&gt; &lt;amount&gt;")
     amt = amt or 0
     await _ask(m, action, {"target": target, "amount": amt}, f"{action} <b>{num(amt)}</b> 💎 for <code>{target}</code>")
+
+
+@router.message(Command("resetdiamonds"))
+async def resetdiamonds_cmd(m: Message, command: CommandObject):
+    """Owner: /resetdiamonds <amount> - EVERY player's wallet becomes <amount> and the bank is emptied. Confirm tap + automatic backup first."""
+    adm.authorize(m.from_user.id, "resetdiamonds")
+    arg = (command.args or "").split()
+    amt = parse_amount(arg[0]) if arg else None
+    if amt is None and not (arg and arg[0] == "0"):
+        raise GameError("Usage: /resetdiamonds &lt;amount&gt;  (e.g. /resetdiamonds 1000)\nEvery player's wallet becomes that amount and the bank becomes 0.")
+    amt = amt or 0
+    await _ask(m, "resetdiamonds", {"amount": amt}, f"set <b>EVERY player's</b> wallet to <b>{num(amt)}</b> 💎 and empty all banks.\n"
+               "A backup file is sent to you first, so /restoredb can undo this.")
 
 
 async def _moderate(m: Message, action: str, target: int, rest: list[str]):
@@ -283,6 +296,11 @@ async def confirm_cb(cb: CallbackQuery, bot: Bot):
         await adm.cancel(nonce)
         await safe_edit(cb, "✖️ Cancelled."); await safe_answer(cb); return
     action, args = await adm.confirm(cb.from_user.id, nonce)
+    if action == "resetdiamonds":                       # safety copy first - if it can't be made, nothing is reset
+        path = await bk.make_backup(get_settings().database_url)
+        if path is None:
+            raise GameError("❌ I couldn't make the safety backup (SQLite only), so I did not reset anything.")
+        await bot.send_document(cb.from_user.id, FSInputFile(path), caption=f"💾 Safety backup before /resetdiamonds ({path.name}). Reply with /restoredb to undo.")
     result = await adm.execute(cb.from_user.id, action, args)
     if action == "maintenance":
         await kv.put("maint", "1" if args["on"] else "0", 5)

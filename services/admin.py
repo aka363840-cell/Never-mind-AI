@@ -12,8 +12,8 @@ from services import economy, users
 from services.errors import GameError
 from services.kv import kv
 
-OWNER_ONLY = {"give", "take", "setbalance", "broadcast", "syncusers", "maintenance", "stats", "backup", "emojiid", "seticon", "ban", "unban", "mute", "unmute"}
-DESTRUCTIVE = {"give", "take", "setbalance", "ban", "broadcast", "maintenance"}
+OWNER_ONLY = {"resetdiamonds", "give", "take", "setbalance", "broadcast", "syncusers", "maintenance", "stats", "backup", "emojiid", "seticon", "ban", "unban", "mute", "unmute"}
+DESTRUCTIVE = {"resetdiamonds", "give", "take", "setbalance", "ban", "broadcast", "maintenance"}
 
 
 def role(uid: int) -> str:
@@ -76,6 +76,17 @@ async def execute(admin_id: int, action: str, args: dict) -> str:
             await economy.apply(s, t, wallet=new - w.balance, kind="admin_set", counterparty=admin_id,
                                 meta={"old": w.balance, "new": new})
             msg = f"✅ wallet of {t}: {w.balance:,} → {new:,}"
+        elif action == "resetdiamonds":
+            from database.models import Wallet
+            amt = int(args["amount"])
+            if amt < 0 or amt > 10**12:
+                raise GameError("❌ Amount must be between 0 and 1,000,000,000,000.")
+            rows = (await s.execute(select(Wallet.user_id, Wallet.balance, Wallet.bank))).all()
+            s.add_all([Transaction(user_id=uid, kind="admin_reset", amount=amt - bal, bank_delta=-bank, counterparty_id=admin_id,
+                                   created_at=utcnow()) for uid, bal, bank in rows])      # every change stays visible in the ledger
+            from database.models import Wallet as W
+            await s.execute(update(W).values(balance=amt, bank=0))
+            msg = f"✅ Reset done: {len(rows):,} players now have {amt:,} 💎 in their wallet (bank emptied)."
         elif action in ("ban", "unban"):
             await _exists(s, t)
             await s.execute(update(User).where(User.id == t).values(
