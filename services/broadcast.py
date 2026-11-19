@@ -107,12 +107,10 @@ async def _run(bot: Bot, admin_id: int, p: dict) -> None:
         await asyncio.gather(*(worker(cid) for cid in ids))
         await users.set_dm_status(reached, True)       # a message got through -> they have started the bot (and aren't blocked)
         await users.set_dm_status(never, False)        # Telegram: no such chat -> only ever seen in groups, skipped from now on
-        top = "".join(f"\n  • {n}× {w}" for w, n in p.get("_why", Counter()).most_common(3))
         head = "🔎 Sync done" if p.get("probe") else "📣 Broadcast done"
         ok = "reachable" if p.get("probe") else "delivered"
         await bot.send_message(admin_id, f"{head}: {c['ok']} {ok}, {c['blocked']} blocked/left, {c['deleted']} deleted accounts, "
-                               f"{c['never']} never started the bot in DM (now skipped), {c['fail']} failed (of {len(ids)})."
-                               + (f"\nWhy the failures:{top}" if top else ""), parse_mode=None)
+                               f"{c['fail'] + c['never']} failed (of {len(ids)}).", parse_mode=None)
     except Exception:
         log.exception("broadcast crashed")
         try:
