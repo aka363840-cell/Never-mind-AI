@@ -115,6 +115,9 @@ async def busy(chat_id: int) -> str | None:
     r = running(chat_id)
     if r:
         return r
+    from services import wordchain as wc
+    if chat_id in wc.GAMES:
+        return "Word Chain"
     from services import wordseek as ws
     cur = await ws.get(chat_id)
     if cur is not None and ws.idle_for(cur) < ws.IDLE_REPLACE_S:

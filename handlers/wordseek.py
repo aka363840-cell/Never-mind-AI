@@ -60,7 +60,9 @@ async def _is_admin(bot: Bot, m: Message) -> bool:
 
 
 async def _start(m: Message, bot: Bot, length: int = W.DEFAULT_LEN) -> None:
-    from services import wordgames as wg                      # Wordly / Hack add-on: one game per chat
+    from services import wordchain as wc, wordgames as wg      # Wordly / Hack / Word Chain: one game per chat
+    if m.chat.id in wc.GAMES:
+        raise GameError("⛓ A Word Chain game is running here - finish it or /end it first.")
     if wg.running(m.chat.id):
         await m.reply("🎮 A Wordly / Hack game is running here - /end it first.")
         return
@@ -90,7 +92,9 @@ async def new_cmd(m: Message, command: CommandObject, bot: Bot):
 
 @router.callback_query(F.data.startswith("ws:new"))
 async def new_cb(cb: CallbackQuery, bot: Bot):
-    from services import wordgames as wg
+    from services import wordchain as wc, wordgames as wg
+    if cb.message.chat.id in wc.GAMES:
+        return await cb.answer("A Word Chain game is running here!", show_alert=True)
     if wg.running(cb.message.chat.id):
         return await cb.answer("A Wordly / Hack game is running here - /end it first.", show_alert=True)
     tail = cb.data[6:]
