@@ -294,6 +294,37 @@ class AvatarCache(Base):
     checked_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
 
 
+class WordGame(Base):
+    """WordSeek: the game running in a chat right now (group, or a private chat). Kept in the DB so a redeploy doesn't lose it."""
+    __tablename__ = "wordseek_games"
+    chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    word: Mapped[str] = mapped_column(String(5))
+    guesses: Mapped[str] = mapped_column(Text, default="[]")          # JSON: [[word, user_id, name], ...]
+    started_by: Mapped[int] = mapped_column(BigInteger, default=0)
+    started_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+
+
+class WordWin(Base):
+    """WordSeek: one row per won game (scores and leaderboards are sums of these, so any time period works)."""
+    __tablename__ = "wordseek_wins"
+    id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    points: Mapped[int] = mapped_column(Integer)
+    guesses: Mapped[int] = mapped_column(Integer)
+    at: Mapped[datetime] = mapped_column(TS, default=utcnow, index=True)
+
+
+class WordHistory(Base):
+    """WordSeek: words already used in a chat (so the same word does not come back soon)."""
+    __tablename__ = "wordseek_history"
+    id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    word: Mapped[str] = mapped_column(String(5))
+    at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+
+
 class WaifuPick(Base):
     """/waifu: one row per player = their current pick. Entirely separate from marriages / relations / family."""
     __tablename__ = "waifu_picks"

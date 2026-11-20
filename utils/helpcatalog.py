@@ -18,7 +18,7 @@ from game.rules import R
 STAFF = frozenset({
     "admin", "stats", "backup", "backupdb", "restoredb", "give", "take", "setbalance", "resetdiamonds", "ban", "unban", "mute",
     "unmute", "userinfo", "logs", "maintenance", "broadcast", "syncusers", "emojiid", "seticon", "delicon", "aitest", "drop",
-    "boss", "purgeadopted", "academyadvance", "academyreset",
+    "boss", "wordstats", "purgeadopted", "academyadvance", "academyreset",
     "gameban", "gameunban", "gamemute", "gameunmute", "botban", "botunban", "botmute", "botunmute",
 })
 
@@ -41,6 +41,11 @@ DESC_LIST: list[tuple[str, str]] = [
     ('cancel', '🛑 Admins: stop a running /tagall'),
     ('members', '👥 Admins: what I know about this group + /members scan to find everyone'),
     ('q', '💬 Quote sticker: reply with /q · /q 3 (more messages) · /q red|#cbafff|random · /q r (keep the replied-to message)'),
+    ('new', '🔎 WordSeek: start a group word game - then just type 5-letter words (🟩🟨🟥), 30 guesses, first to find it wins'),
+    ('end', '🛑 End the WordSeek game (group admins)'),
+    ('wlb', '🏆 WordSeek leaderboard: /wlb [global|group] [today|week|month|all]'),
+    ('myscore', '📊 Your WordSeek score (reply to see someone else\'s)'),
+    ('wordhelp', '❓ WordSeek rules and commands'),
     ('afk', '😴 Go away: /afk [reason] - I tell people who tag you, and welcome you back when you write'),
     ('waifu', '🌸 Your Waifu of the Day: a random member of this group, the same one for 24h in every group (not family)'),
     ('help', '📖 Command guide'),
@@ -309,7 +314,7 @@ CATEGORIES: list[tuple[str, list[str]]] = [
                           "familytree", "addfamily", "unfamily", "roles", "gender", "familybonus", "ship",
                           "father", "mother", "brother", "sister", "@roles"]),
     ("🎭 Social & Fun", ["actions", "hug", "slap", "kiss", "compliment", "roast", "truth", "dare", "joke", "fact", "horoscope",
-                         "fortune", "iq", "lucky", "rate", "waifu", "afk", "sex", "whisper", "tagall", "etagall", "cancel", "members", "q", "@actions"]),
+                         "fortune", "iq", "lucky", "rate", "waifu", "afk", "sex", "whisper", "tagall", "etagall", "cancel", "members", "q", "new", "end", "wlb", "myscore", "wordhelp", "@actions"]),
     ("Academy 🎓", ["enroll", "academy", "schedule", "study", "attend", "hangout", "rest", "club", "parttime", "exam", "grades", "classrank",
                       "rival", "rivalduel", "crush", "crushoff", "campuscouple", "campusdate", "clubs", "buddy", "adventure", "academyremind", "reportcard", "halloffame", "academyhelp"]),
     ("🤖 AI Chat", ["ask"]),
