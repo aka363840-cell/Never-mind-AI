@@ -7,8 +7,8 @@ from typing import Any
 # Everything security-related is OFF by default: adding the bot to a group changes nothing until an admin opts in.
 DEFAULTS: dict[str, Any] = {
     "rules": "",
-    "welcome": {"on": False, "text": "", "clean": False},
-    "goodbye": {"on": False, "text": ""},
+    "welcome": {"on": False, "text": "", "clean": False, "mute": False},
+    "goodbye": {"on": False, "text": "", "mute": False},
     "warn": {"limit": 3, "mode": "mute", "duration": 3600, "expire": 0},       # expire: seconds a warning stays active (0 = forever)
     "locks": {},
     "flood": {"on": False, "limit": 8, "window": 10, "action": "mute", "duration": 600},
@@ -196,9 +196,9 @@ LEVELS = tuple(PRESETS)
 
 
 def legacy_suppressed(st: dict, kind: str) -> bool:
-    """True only when the group wrote its OWN welcome / goodbye text and enabled it. Otherwise the bot's original greeting stays."""
+    """True when the group muted the greeting (/welcomeoff, /goodbyeoff) or wrote its OWN welcome / goodbye text and enabled it. Otherwise the bot's original greeting stays."""
     sec = st["goodbye" if kind == "leave" else "welcome"]
-    return bool(sec["on"] and sec["text"])
+    return bool(sec.get("mute") or (sec["on"] and sec["text"]))
 
 
 def apply_preset(settings: dict, level: str) -> dict:
