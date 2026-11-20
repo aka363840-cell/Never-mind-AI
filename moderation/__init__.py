@@ -24,6 +24,11 @@ def set_flair_provider(fn) -> None:
     _f(fn)
 
 
+def set_greeting_gate(fn) -> None:
+    from .api import set_greeting_gate as _f
+    _f(fn)
+
+
 async def legacy_welcome_suppressed(chat_id: int, kind: str = "join") -> bool:
     from .api import legacy_welcome_suppressed as _f
     return await _f(chat_id, kind)

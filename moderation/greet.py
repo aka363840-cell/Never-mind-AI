@@ -28,12 +28,9 @@ def build(text: str, user, chat_title: str, chat_id: int, count: int | None):
 async def send(bot: Bot, chat, user, kind: str = "welcome") -> bool:
     """Send the group's custom welcome / goodbye if enabled. Returns True if something was sent. Never raises."""
     try:
-        try:                                   # /welcomemsg off and /leavemsg off silence this one too
-            from handlers.welcome import _switched_off
-            if await _switched_off(chat.id, "join" if kind == "welcome" else "leave"):
-                return False
-        except Exception:
-            pass
+        from .api import greeting_switched_off     # /welcomemsg off and /leavemsg off silence this one too (host-injected)
+        if await greeting_switched_off(chat.id, "join" if kind == "welcome" else "leave"):
+            return False
         st = await store.get_settings(chat.id)
         sec = st["welcome" if kind == "welcome" else "goodbye"]
         if not sec["on"] or not sec["text"]:

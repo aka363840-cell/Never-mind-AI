@@ -15,6 +15,25 @@ async def legacy_welcome_suppressed(chat_id: int, kind: str = "join") -> bool:
         return False
 
 
+# ---- optional greeting switch (/welcomemsg, /leavemsg) injected by the host bot; moderation never imports bot code
+_greeting_gate = None
+
+
+def set_greeting_gate(fn) -> None:
+    """fn(chat_id, kind 'join'|'leave') -> awaitable bool, True = the group switched that greeting OFF."""
+    global _greeting_gate
+    _greeting_gate = fn
+
+
+async def greeting_switched_off(chat_id: int, kind: str) -> bool:
+    if _greeting_gate is None:
+        return False
+    try:
+        return bool(await _greeting_gate(chat_id, kind))
+    except Exception:
+        return False
+
+
 # ---- optional "reaction flair" (e.g. the game's kick GIF) injected by the host bot; moderation never imports game code
 _flair_provider = None
 
