@@ -1,10 +1,10 @@
-"""Welcome / goodbye messages for groups (always on)."""
+"""Welcome / goodbye messages for groups (on by default, switchable per group)."""
 from __future__ import annotations
 
 import logging
 
 from aiogram import Bot, F, Router
-from aiogram.filters import ChatMemberUpdatedFilter, JOIN_TRANSITION, LEAVE_TRANSITION
+from aiogram.filters import ChatMemberUpdatedFilter, Command, CommandObject, JOIN_TRANSITION, LEAVE_TRANSITION
 from aiogram.types import ChatJoinRequest, ChatMemberUpdated, InlineKeyboardButton as B, Message
 
 from database.models import AppState
@@ -36,9 +36,24 @@ WELCOME += content.WELCOME_MORE
 GOODBYE += content.GOODBYE_MORE
 
 
+def _flag_key(chat_id: int, kind: str) -> str:
+    return f"wl_off:{'leave' if kind == 'leave' else 'join'}:{chat_id}"
+
+
+async def _switched_off(chat_id: int, kind: str) -> bool:
+    try:
+        async with db.tx() as s:
+            row = await s.get(AppState, _flag_key(chat_id, kind))
+            return bool(row and row.value == "1")
+    except Exception:
+        return False
+
+
 async def welcome_on(chat_id: int, kind: str = "join") -> bool:
-    """Welcome / goodbye messages are ALWAYS on (no switch any more; an old 'off' flag in the DB is ignored).
-    The only exception: a group that configured its OWN welcome / goodbye with the moderation module (it sends that instead)."""
+    """Welcome / goodbye are ON by default. A group admin can switch each off with /nmwelcome off and /nmgoodbye off.
+    A group that configured its OWN welcome / goodbye with the moderation module gets that instead."""
+    if await _switched_off(chat_id, kind):
+        return False
     try:
         from moderation import legacy_welcome_suppressed
         if await legacy_welcome_suppressed(chat_id, kind):
@@ -46,6 +61,47 @@ async def welcome_on(chat_id: int, kind: str = "join") -> bool:
     except Exception:
         pass                                          # moderation missing / broken -> behave exactly as before
     return True
+
+
+async def _is_admin(bot: Bot, chat_id: int, uid: int) -> bool:
+    try:
+        from config import get_settings
+        if uid == get_settings().owner_id:
+            return True
+    except Exception:
+        pass
+    try:
+        return (await bot.get_chat_member(chat_id, uid)).status in ("administrator", "creator")
+    except Exception:
+        return False
+
+
+async def _toggle(m: Message, bot: Bot, command: CommandObject, kind: str, label: str, cmd: str) -> None:
+    if m.chat.type not in ("group", "supergroup"):
+        await m.reply("This works in groups only.")
+        return
+    arg = (command.args or "").strip().lower()
+    if arg not in ("on", "off"):
+        state = "OFF 🔕" if await _switched_off(m.chat.id, kind) else "ON 🔔"
+        await m.reply(f"{label} messages are <b>{state}</b>\nAdmins: <code>/{cmd} on</code> or <code>/{cmd} off</code>")
+        return
+    if m.from_user is None or not await _is_admin(bot, m.chat.id, m.from_user.id):
+        await m.reply("❌ Only group admins can change this.")
+        return
+    from services import users
+    async with db.tx() as s:
+        await users.set_state(s, _flag_key(m.chat.id, kind), "1" if arg == "off" else "0")
+    await m.reply(f"{'🔔' if arg == 'on' else '🔕'} {label} messages are now <b>{arg.upper()}</b>.")
+
+
+@router.message(Command("nmwelcome"))
+async def nm_welcome(m: Message, bot: Bot, command: CommandObject):
+    await _toggle(m, bot, command, "join", "Welcome", "nmwelcome")
+
+
+@router.message(Command("nmgoodbye"))
+async def nm_goodbye(m: Message, bot: Bot, command: CommandObject):
+    await _toggle(m, bot, command, "leave", "Leaving", "nmgoodbye")
 
 
 async def _once(kind: str, chat_id: int, uid: int) -> bool:
