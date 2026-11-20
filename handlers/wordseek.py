@@ -1,5 +1,6 @@
 """WordSeek - the group word game. /new starts it; then everybody just types 5-letter words in the chat.
-🟩 right letter, right place · 🟨 right letter, wrong place · 🟥 not in the word.  30 guesses, first to find the word wins."""
+🟩 right letter, right place · 🟨 right letter, wrong place · 🟥 not in the word.  First to find the word wins.
+/new (5 letters) · /new4 · /new5 · /new6 pick the word length."""
 from __future__ import annotations
 
 import logging
@@ -35,13 +36,20 @@ def _lines(st: ws.State, last: int | None = None) -> str:
 def _board(st: ws.State) -> str:
     n = len(st.guesses)
     absent = W.absent_letters(st.word, [g[0] for g in st.guesses])
-    return (f"🔎 <b>WordSeek</b> · guess <b>{n}/{W.MAX_GUESSES}</b>\n\n{_lines(st, SHOW)}"
+    return (f"🔎 <b>WordSeek</b> · {len(st.word)} letters · guess <b>{n}/{W.max_guesses(len(st.word))}</b>\n\n{_lines(st, SHOW)}"
             + (f"\n\n🚫 Not in the word: <code>{' '.join(c.upper() for c in absent)}</code>" if absent else "")
-            + "\n\n<i>Type any 5-letter word to guess.</i>")
+            + f"\n\n<i>Type any {len(st.word)}-letter word to guess.</i>")
 
 
-def _again() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[B(text="🔁 Play again", callback_data="ws:new")]])
+def _again(st: "ws.State") -> InlineKeyboardMarkup:
+    n = len(st.word)
+    return InlineKeyboardMarkup(inline_keyboard=[[B(text=f"🔁 Play again ({n} letters)", callback_data=f"ws:new{n}")]])
+
+
+def _intro(n: int) -> str:
+    return (f"I picked a hidden <b>{n}-letter word</b>. Everybody can guess: just type a {n}-letter word in the chat.\n"
+            "🟩 right letter, right place\n🟨 right letter, wrong place\n🟥 letter is not in the word\n\n"
+            f"You have <b>{W.max_guesses(n)}</b> guesses together. The first to find the word wins points! 🏆")
 
 
 async def _is_admin(bot: Bot, m: Message) -> bool:
@@ -51,7 +59,7 @@ async def _is_admin(bot: Bot, m: Message) -> bool:
     return await adm(bot, m.chat.id, m.from_user.id)
 
 
-async def _start(m: Message, bot: Bot) -> None:
+async def _start(m: Message, bot: Bot, length: int = W.DEFAULT_LEN) -> None:
     cur = await ws.get(m.chat.id)
     note = ""
     if cur is not None:
@@ -60,21 +68,26 @@ async def _start(m: Message, bot: Bot) -> None:
             return
         note = f"⌛ The old game was left unfinished - the word was <b>{cur.word.upper()}</b>.\n\n"
         await ws.finish(cur)
-    st = await ws.start(m.chat.id, m.from_user.id)
-    await m.answer(note + "🔎 <b>WordSeek</b> - a new game has started!\n\nI picked a hidden <b>5-letter word</b>. Everybody can guess: just type a word in the chat.\n"
-                   "🟩 right letter, right place\n🟨 right letter, wrong place\n🟥 letter is not in the word\n\n"
-                   f"You have <b>{W.MAX_GUESSES}</b> guesses together. The first to find the word wins points! 🏆")
+    st = await ws.start(m.chat.id, m.from_user.id, length)
+    await m.answer(note + "🔎 <b>WordSeek</b> - a new game has started!\n\n" + _intro(length))
 
 
-@router.message(Command("new", "wordseek", "wnew"))
-async def new_cmd(m: Message, bot: Bot):
+def _len_of(command: CommandObject) -> int:
+    d = (command.command or "")[-1:]
+    return int(d) if d.isdigit() and int(d) in W.LENGTHS else W.DEFAULT_LEN
+
+
+@router.message(Command("new", "wordseek", "wnew", "new4", "new5", "new6"))
+async def new_cmd(m: Message, command: CommandObject, bot: Bot):
     if m.from_user is None:
         return
-    await _start(m, bot)
+    await _start(m, bot, _len_of(command))
 
 
-@router.callback_query(F.data == "ws:new")
+@router.callback_query(F.data.startswith("ws:new"))
 async def new_cb(cb: CallbackQuery, bot: Bot):
+    tail = cb.data[6:]
+    length = int(tail) if tail.isdigit() and int(tail) in W.LENGTHS else W.DEFAULT_LEN
     cur = await ws.get(cb.message.chat.id)
     if cur is not None and ws.idle_for(cur) < ws.IDLE_REPLACE_S:
         return await cb.answer("A game is already running!", show_alert=True)
@@ -85,9 +98,8 @@ async def new_cb(cb: CallbackQuery, bot: Bot):
         pass
     if cur is not None:
         await ws.finish(cur)
-    await ws.start(cb.message.chat.id, cb.from_user.id)
-    await cb.message.answer(f"🔎 <b>WordSeek</b> - new game started by {mention(cb.from_user.id, cb.from_user.full_name)}!\n"
-                            f"Guess the hidden 5-letter word - just type words. You have <b>{W.MAX_GUESSES}</b> guesses. 🟩🟨🟥")
+    await ws.start(cb.message.chat.id, cb.from_user.id, length)
+    await cb.message.answer(f"🔎 <b>WordSeek</b> - new game started by {mention(cb.from_user.id, cb.from_user.full_name)}!\n\n" + _intro(length))
 
 
 @router.message(Command("end", "wend"))
@@ -98,7 +110,7 @@ async def end_cmd(m: Message, bot: Bot):
     if not await _is_admin(bot, m):
         raise GameError("⛔ Only group admins can end the game.")
     await ws.finish(st)
-    await m.reply(f"🛑 Game ended. The word was <b>{st.word.upper()}</b>.\n\n{_lines(st, SHOW) if st.guesses else ''}".strip(), reply_markup=_again())
+    await m.reply(f"🛑 Game ended. The word was <b>{st.word.upper()}</b>.\n\n{_lines(st, SHOW) if st.guesses else ''}".strip(), reply_markup=_again(st))
 
 
 async def _guess(m: Message, bot: Bot, st: ws.State) -> bool:
@@ -121,10 +133,10 @@ async def _guess(m: Message, bot: Bot, st: ws.State) -> bool:
             await users.touch(uid, m.from_user.username, name)
             pts = await ws.finish(st, (uid, name))
             msg = await m.reply(f"🎉 <b>{mention(uid, name)}</b> found the word <b>{word.upper()}</b> in <b>{len(st.guesses)}</b> guesses!\n"
-                                f"⭐ <b>+{pts}</b> points\n\n{_lines(st)}", reply_markup=_again())
-        elif len(st.guesses) >= W.MAX_GUESSES:
+                                f"⭐ <b>+{pts}</b> points\n\n{_lines(st)}", reply_markup=_again(st))
+        elif len(st.guesses) >= W.max_guesses(len(st.word)):
             await ws.finish(st)
-            msg = await m.reply(f"💀 Out of guesses! The word was <b>{st.word.upper()}</b>.\n\n{_lines(st, SHOW)}", reply_markup=_again())
+            msg = await m.reply(f"💀 Out of guesses! The word was <b>{st.word.upper()}</b>.\n\n{_lines(st, SHOW)}", reply_markup=_again(st))
         else:
             msg = await m.reply(_board(st))
             st.board_msg = msg.message_id
@@ -143,7 +155,7 @@ class WordSeekMiddleware(BaseMiddleware):
         try:
             if isinstance(event, Message) and event.text and event.from_user and not event.from_user.is_bot and W.is_candidate(event.text):
                 st = await ws.get(event.chat.id)
-                if st is not None and W.is_valid(event.text) and await _guess(event, data["bot"], st):
+                if st is not None and len(event.text.strip()) == len(st.word) and W.is_valid(event.text) and await _guess(event, data["bot"], st):
                     return None
         except Exception:
             log.exception("wordseek guess failed")
@@ -201,7 +213,7 @@ async def stats_cmd(m: Message):
 @router.message(Command("wordhelp", "whelp"))
 async def help_cmd(m: Message):
     await m.reply("🔎 <b>WordSeek</b> - guess the hidden 5-letter word together!\n\n"
-                  "/new - start a game (anyone, groups or DM)\n/end - end the game (group admins)\n"
+                  "/new - start a 5-letter game (anyone, groups or DM)\n/new4 · /new5 · /new6 - choose 4, 5 or 6 letters\n/end - end the game (group admins)\n"
                   "/wlb [global|group] [today|week|month|all] - leaderboard\n/myscore [period] - your score (reply to see someone else's)\n\n"
-                  "<b>How to play</b>: after /new just type 5-letter words. 🟩 right letter in the right place · 🟨 right letter, wrong place · 🟥 not in the word.\n"
-                  f"{W.MAX_GUESSES} guesses per game. The winner earns <b>36 − guesses</b> points (5 to 35). Fewer guesses = more points!")
+                  "<b>How to play</b>: after /new just type words of that length. 🟩 right letter in the right place · 🟨 right letter, wrong place · 🟥 not in the word.\n"
+                  "Guesses per game: 25 (4 letters) · 30 (5) · 35 (6). The winner earns the limit + 6 − guesses used (at least 5). Fewer guesses = more points!")

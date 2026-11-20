@@ -53,11 +53,11 @@ async def _save(st: State) -> None:
             row.guesses, row.updated_at = json.dumps(st.guesses), utcnow()
 
 
-async def start(chat_id: int, uid: int) -> State:
+async def start(chat_id: int, uid: int, length: int = W.DEFAULT_LEN) -> State:
     async with db.tx() as s:
         recent = set((await s.execute(select(WordHistory.word).where(WordHistory.chat_id == chat_id)
                                       .order_by(WordHistory.id.desc()).limit(HISTORY))).scalars())
-    st = State(chat_id, W.pick_word(recent), [], uid)
+    st = State(chat_id, W.pick_word(length, recent), [], uid)
     async with db.tx() as s:
         await s.execute(delete(WordGame).where(WordGame.chat_id == chat_id))
     _cache[chat_id] = st
@@ -72,7 +72,7 @@ async def finish(st: State, winner: tuple[int, str] | None = None) -> int:
         await s.execute(delete(WordGame).where(WordGame.chat_id == st.chat_id))
         s.add(WordHistory(chat_id=st.chat_id, word=st.word))
         if winner:
-            pts = W.points(len(st.guesses))
+            pts = W.points(len(st.guesses), len(st.word))
             s.add(WordWin(chat_id=st.chat_id, user_id=winner[0], points=pts, guesses=len(st.guesses)))
     _cache[st.chat_id] = None
     return pts

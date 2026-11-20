@@ -298,7 +298,7 @@ class WordGame(Base):
     """WordSeek: the game running in a chat right now (group, or a private chat). Kept in the DB so a redeploy doesn't lose it."""
     __tablename__ = "wordseek_games"
     chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
-    word: Mapped[str] = mapped_column(String(5))
+    word: Mapped[str] = mapped_column(String(8))
     guesses: Mapped[str] = mapped_column(Text, default="[]")          # JSON: [[word, user_id, name], ...]
     started_by: Mapped[int] = mapped_column(BigInteger, default=0)
     started_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
@@ -321,7 +321,7 @@ class WordHistory(Base):
     __tablename__ = "wordseek_history"
     id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
     chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
-    word: Mapped[str] = mapped_column(String(5))
+    word: Mapped[str] = mapped_column(String(8))
     at: Mapped[datetime] = mapped_column(TS, default=utcnow)
 
 
