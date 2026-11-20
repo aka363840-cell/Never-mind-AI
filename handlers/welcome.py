@@ -50,7 +50,7 @@ async def _switched_off(chat_id: int, kind: str) -> bool:
 
 
 async def welcome_on(chat_id: int, kind: str = "join") -> bool:
-    """Welcome / goodbye are ON by default. A group admin can switch each off with /nmwelcome off and /nmgoodbye off.
+    """Welcome / goodbye are ON by default. A group admin can switch each off with /welcomemsg off and /leavemsg off.
     A group that configured its OWN welcome / goodbye with the moderation module gets that instead."""
     if await _switched_off(chat_id, kind):
         return False
@@ -94,14 +94,14 @@ async def _toggle(m: Message, bot: Bot, command: CommandObject, kind: str, label
     await m.reply(f"{'🔔' if arg == 'on' else '🔕'} {label} messages are now <b>{arg.upper()}</b>.")
 
 
-@router.message(Command("nmwelcome"))
+@router.message(Command("welcomemsg", ignore_case=True))
 async def nm_welcome(m: Message, bot: Bot, command: CommandObject):
-    await _toggle(m, bot, command, "join", "Welcome", "nmwelcome")
+    await _toggle(m, bot, command, "join", "Welcome", "welcomemsg")
 
 
-@router.message(Command("nmgoodbye"))
+@router.message(Command("leavemsg", ignore_case=True))
 async def nm_goodbye(m: Message, bot: Bot, command: CommandObject):
-    await _toggle(m, bot, command, "leave", "Leaving", "nmgoodbye")
+    await _toggle(m, bot, command, "leave", "Leaving", "leavemsg")
 
 
 async def _once(kind: str, chat_id: int, uid: int) -> bool:
