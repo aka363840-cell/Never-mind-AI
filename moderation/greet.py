@@ -36,7 +36,7 @@ async def send(bot: Bot, chat, user, kind: str = "welcome") -> bool:
             pass
         st = await store.get_settings(chat.id)
         sec = st["welcome" if kind == "welcome" else "goodbye"]
-        if sec.get("mute") or not sec["on"] or not sec["text"]:
+        if not sec["on"] or not sec["text"]:
             return False
         try:
             count = await tg(bot.get_chat_member_count, chat.id)

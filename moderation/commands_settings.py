@@ -88,9 +88,9 @@ async def _greeting_cmd(m: Message, command: CommandObject, bot: Bot, key: str):
     arg = (command.args or "").strip().lower().split()
     if not arg:
         await perms.require_actor(bot, m.chat.id, m.from_user.id, None)
-        lines = [f"👋 <b>{key.capitalize()}</b>: {'🔴 OFF (muted)' if sec.get('mute') else '🟢 ON' if (sec['on'] or key == 'welcome') else '🟢 ON (default text)' if False else '🟢 ON' if key == 'welcome' else '🔴 OFF'}" + (f" · clean: {'on' if sec.get('clean') else 'off'}" if key == 'welcome' else "")]
+        lines = [f"👋 <b>{key.capitalize()}</b>: {'🟢 ON' if sec['on'] else '🔴 OFF'}" + (f" · clean: {'on' if sec.get('clean') else 'off'}" if key == 'welcome' else "")]
         lines.append("Text:\n" + (esc(sec["text"]) if sec["text"] else "<i>(not set - " + ("the bot's default greeting is used)" if key == "welcome" else "no goodbye is sent)") + "</i>"))
-        lines.append(f"\n<code>/{key}on</code> · <code>/{key}off</code> · <code>/set{key} …</code> · <code>/reset{key}</code>")
+        lines.append(f"\n<code>/{key} on|off</code> · <code>/set{key} …</code> · <code>/reset{key}</code>")
         return await reply(m, "\n".join(lines))
     r = await prepare(m, command, bot, right="info", bot_right=None)
     if arg[0] in ("on", "off", "yes", "no"):
@@ -115,35 +115,6 @@ async def cmd_welcome(m: Message, command: CommandObject, bot: Bot):
 @command("goodbye", cat="settings", usage="/goodbye [on|off]", desc="Show or toggle the goodbye message", gate=False)
 async def cmd_goodbye(m: Message, command: CommandObject, bot: Bot):
     await _greeting_cmd(m, command, bot, "goodbye")
-
-
-async def _mute_greeting(m: Message, command: CommandObject, bot: Bot, key: str, mute: bool):
-    r = await prepare(m, command, bot, right="info", bot_right=None)
-    await store.save_settings(r.chat_id, lambda s: s[key].update(mute=mute))
-    await store.log_action(r.chat_id, r.actor, None, f"{key}-{'off' if mute else 'on'}")
-    word = "welcome" if key == "welcome" else "goodbye"
-    await reply(m, f"{'🔕' if mute else '🔔'} {word.capitalize()} messages are now <b>{'OFF' if mute else 'ON'}</b> in this group (no greeting of any kind is sent)." if mute
-                else f"🔔 {word.capitalize()} messages are now <b>ON</b> again in this group.")
-
-
-@command("welcomeon", cat="settings", usage="/welcomeon", desc="Turn welcome messages ON in this group")
-async def cmd_welcomeon(m: Message, command: CommandObject, bot: Bot):
-    await _mute_greeting(m, command, bot, "welcome", False)
-
-
-@command("welcomeoff", cat="settings", usage="/welcomeoff", desc="Turn welcome messages OFF in this group (the bot stays silent on joins)")
-async def cmd_welcomeoff(m: Message, command: CommandObject, bot: Bot):
-    await _mute_greeting(m, command, bot, "welcome", True)
-
-
-@command("goodbyeon", cat="settings", usage="/goodbyeon", desc="Turn leaving (goodbye) messages ON in this group")
-async def cmd_goodbyeon(m: Message, command: CommandObject, bot: Bot):
-    await _mute_greeting(m, command, bot, "goodbye", False)
-
-
-@command("goodbyeoff", cat="settings", usage="/goodbyeoff", desc="Turn leaving (goodbye) messages OFF in this group")
-async def cmd_goodbyeoff(m: Message, command: CommandObject, bot: Bot):
-    await _mute_greeting(m, command, bot, "goodbye", True)
 
 
 async def _reset_greeting(m, command, bot, key):
