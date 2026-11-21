@@ -102,9 +102,11 @@ def test_every_new_command_answers_and_buttons_work():
         db, h = await _setup()
 
         out = await h.say(1, "/arcade")
-        assert any("Arcade" in t for t in out) and "ar:sc" in h.buttons()
+        assert any("Games" in t for t in out) and "ar:solo" in h.buttons() and "ar:ws" in h.buttons()
+        out = await h.tap(1, "ar:solo")                                      # solo & daily page keeps the old buttons
+        assert any("Solo" in t for t in out) and "ar:sc" in h.buttons()
         out = await h.tap(1, "nav:arcade")                                   # reachable from the main menu page router too
-        assert any("Arcade" in t for t in out)
+        assert any("Games" in t for t in out)
 
         # --- scratch card: costs 100, reveal works, tapping someone else's card is refused
         before = (await economy.balance(1)).balance

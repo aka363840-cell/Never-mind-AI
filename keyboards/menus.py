@@ -18,9 +18,10 @@ def main_menu() -> M:
         [B(text="🏰 Clan", callback_data="nav:clan"), B(text="🐾 Pets & Hunt", callback_data="nav:pet")],
         [B(text="🗺 Realm: Dungeon & Heists", callback_data="nav:realm")],
         [B(text="🎓 Academy Life", callback_data="nav:academy")],
-        [B(text="👨‍👩‍👧‍👦 Love & Family", callback_data="nav:family"), B(text="🎉 Fun", callback_data="nav:fun")],
+        [B(text="👨‍👩‍👧‍👦 Love & Family", callback_data="nav:family"), B(text="🎉 Fun & Social", callback_data="nav:fun")],
         [B(text="🎰 Casino", callback_data="nav:casino"), B(text="🤖 AI Chat", callback_data="nav:ai")],
-        [B(text="🕹 Arcade & Social", callback_data="nav:arcade")],
-        [B(text="📖 Commands", callback_data="nav:help"), B(text="📜 Rules", callback_data="rules:home")],
+        [B(text="🕹 Games", callback_data="nav:arcade"), B(text="👥 Group Tools", callback_data="nav:tools")],
+        [B(text="📖 Help", callback_data="nav:help"), B(text="📜 Rules", callback_data="rules:home")],
+        [B(text="🛡 Moderation (admins)", callback_data="nav:modhelp")],
         [B(text="ℹ️ About", callback_data="nav:about"), B(text="⚙️ Settings", callback_data="nav:settings")],
     ])

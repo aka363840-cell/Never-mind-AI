@@ -46,6 +46,7 @@ async def render(name: str, user: User):
     if name == "realm": return views.realm_help()
     if name == "casino": return views.casino_help()
     if name == "fun": return views.fun_help()
+    if name == "tools": return views.group_tools()
     if name == "ai": return views.ai_info()
     if name == "about": return await views.about()
     if name == "help": return views.command_guide()

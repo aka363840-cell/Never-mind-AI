@@ -1,6 +1,6 @@
 """Arcade & social commands. Plain commands + inline buttons only (no web app).
 
-/arcade hub · /scratch · /rps · /ttt · /hangman · /wyr · /riddle · /fact · /horoscope · /fortune · /rep /toprep · /interest
+/arcade (=/games) hub · /scratch · /rps · /ttt · /hangman · /wyr · /riddle · /fact · /horoscope · /fortune · /rep /toprep · /interest
 """
 from __future__ import annotations
 
@@ -67,37 +67,47 @@ def _game_info(key: str):
 
 # =============================================================== hub
 async def hub(uid: int) -> tuple[str, InlineKeyboardMarkup]:
-    st = await arcade.stats_of(uid)
-    text = (f"🕹 <b>Arcade &amp; Social</b>\n{DIV}\n"
-            f"🌟 Reputation <b>{st.get('rep', 0)}</b> · 🎟 Cards <b>{st.get('scratch', 0)}</b> · "
-            f"⭕ TTT wins <b>{st.get('ttt_win', 0)}</b>/{st.get('ttt_play', 0)} · 🔤 Hangman wins <b>{st.get('hangman_win', 0)}</b>\n\n"
-            f"🎟 /scratch — {arcade.SCRATCH_COST} 💎 card, match 3 to win up to <b>3,000</b>\n"
-            "✊ /rps <i>[bet]</i> — rock-paper-scissors vs me\n"
-            "⭕ /ttt <i>[reply/@user]</i> — tic-tac-toe with a friend (winner takes 25 💎)\n"
-            "🔤 /hangman — guess the word, win 💎\n"
-            "⚡ /tap <i>amount</i> — fastest finger wins everybody's entry (group, min. 2 players)\n"
-            "💥 /crash <i>amount</i> — first to count the letters of the secret word wins (group, min. 2 players)\n"
+    """🕹 Games: every group game with its commands; solo / daily extras are one tap away (ar:solo)."""
+    text = (f"🕹 <b>Games</b>\n{DIV}\n"
+            "<b>👥 Group games</b> <i>(one game per chat at a time)</i>\n"
             "🔎 /new /new4 /new5 /new6 · /wlb · /myscore · /wordhelp — WordSeek word guessing\n"
             "🔠 /wordly (/wl) — make words from 8 letters\n"
             "🔐 /hack3 /hack4 /hack5 /hack6 <i>amount</i> · /joinhack — crack the code, win the pot\n"
             "⛓ /wc · /join · /forcestart — Word Chain\n"
             "🐙 /jumble (/jum) · /jskip · /jlb · /jstats — unscramble words\n"
-            "🎭 /charades (/describe) — describe it, host rotates\n"
-            "🛑 /end — end the running game in the chat\n"
+            "🎭 /charades (/describe) — describe it, the host rotates\n"
+            "⚡ /tap <i>amount</i> — fastest finger wins everybody's entry\n"
+            "💥 /crash <i>amount</i> — first to count the letters wins\n"
+            "⭕ /ttt <i>[reply/@user]</i> — tic-tac-toe with a friend\n"
             "🤔 /wyr — would you rather? the group votes live\n"
+            "🛑 /end — end the running game in the chat\n\n"
+            "<i>Tap a game for how to play 👇</i>")
+    rows = [[B(text="🔎 WordSeek", callback_data="ar:ws"), B(text="🔠 Wordly", callback_data="ar:wl")],
+            [B(text="🔐 Hack", callback_data="ar:hk"), B(text="⛓ Word Chain", callback_data="ar:wc")],
+            [B(text="🐙 Jumble", callback_data="ar:jm"), B(text="🎭 Charades", callback_data="ar:ch")],
+            [B(text="⚡ Fastest Tap", callback_data="ar:tap"), B(text="💥 Crash Count", callback_data="ar:cr")],
+            [B(text="⭕ Tic-Tac-Toe", callback_data="ar:ttt"), B(text="🤔 Would you rather", callback_data="ar:wy")],
+            [B(text="🎟 Solo & daily fun ➡️", callback_data="ar:solo")],
+            back()]
+    return text, kb(rows)
+
+
+async def solo(uid: int) -> tuple[str, InlineKeyboardMarkup]:
+    st = await arcade.stats_of(uid)
+    text = (f"🎟 <b>Solo &amp; daily fun</b>\n{DIV}\n"
+            f"🌟 Reputation <b>{st.get('rep', 0)}</b> · 🎟 Cards <b>{st.get('scratch', 0)}</b> · "
+            f"⭕ TTT wins <b>{st.get('ttt_win', 0)}</b>/{st.get('ttt_play', 0)} · 🔤 Hangman wins <b>{st.get('hangman_win', 0)}</b>\n\n"
+            f"🎟 /scratch — {arcade.SCRATCH_COST} 💎 card, match 3 to win up to <b>3,000</b>\n"
+            "✊ /rps <i>[bet]</i> — rock-paper-scissors vs me\n"
+            "🔤 /hangman — guess the word, win 💎\n"
             "🧩 /riddle · 💡 /fact · 🔮 /horoscope · 🥠 /fortune\n"
             "🌟 /rep <i>(reply)</i> · /toprep — give respect, climb the board\n"
             f"🏦 /interest — daily interest on your bank (from {arcade.INTEREST_MIN_BANK:,} 💎)")
     rows = [[B(text="🎟 Scratch card", callback_data="ar:sc"), B(text="🔤 Hangman", callback_data="ar:hm")],
-            [B(text="⭕ Tic-Tac-Toe", callback_data="ar:ttt"), B(text="🤔 Would you rather", callback_data="ar:wy")],
-            [B(text="⚡ Fastest Tap", callback_data="ar:tap"), B(text="💥 Crash Count", callback_data="ar:cr")],
-            [B(text="🔎 WordSeek", callback_data="ar:ws"), B(text="🔠 Wordly", callback_data="ar:wl")],
-            [B(text="🔐 Hack", callback_data="ar:hk"), B(text="⛓ Word Chain", callback_data="ar:wc")],
-            [B(text="🐙 Jumble", callback_data="ar:jm"), B(text="🎭 Charades", callback_data="ar:ch")],
             [B(text="🧩 Riddle", callback_data="ar:rd"), B(text="💡 Fun fact", callback_data="ar:fc")],
             [B(text="🔮 Horoscope", callback_data="ar:ho"), B(text="🥠 Fortune", callback_data="ar:fo")],
             [B(text="🏦 Bank interest", callback_data="ar:in"), B(text="🌟 Top reputation", callback_data="ar:tr")],
-            back()]
+            [B(text="⬅️ Games", callback_data="ar:hub")]]
     return text, kb(rows)
 
 
@@ -111,6 +121,10 @@ async def arcade_cmd(m: Message, db_user: User):
 async def arcade_nav(cb: CallbackQuery, db_user: User):
     what = cb.data.split(":")[1]
     msg = cb.message
+    if what in ("solo", "hub"):                                  # page navigation: edit the same message
+        text, markup = await (solo if what == "solo" else hub)(db_user.id)
+        await safe_answer(cb)
+        return await safe_edit(cb, text, markup)
     table = {"sc": do_scratch, "hm": do_hangman, "ttt": do_ttt, "wy": do_wyr, "rd": do_riddle, "fc": do_fact,
              "ho": do_horoscope, "fo": do_fortune, "in": do_interest, "tr": do_toprep,
              "tap": speed_h.do_tap_info, "cr": speed_h.do_crash_info,

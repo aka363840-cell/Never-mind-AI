@@ -75,8 +75,8 @@ async def about() -> tuple[str, InlineKeyboardMarkup]:
             "• 🎭 Fun actions with reaction GIFs\n• 🛡 Safe: every diamond move is logged\n\n"
             f"{DIV}\n👥 <b>{users_n:,}</b> players · 💬 <b>{groups_n:,}</b> groups\n"
             + (f"👑 Owner: <a href=\"tg://user?id={owner}\">contact</a>\n" if owner else "")
-            + "\n<i>Need help? Open 📖 Commands.</i>")
-    rows = [[B(text="📖 Commands", callback_data="nav:help"), B(text="🎮 Menu", callback_data="nav:main")]]
+            + "\n<i>Need help? Open 📖 Help.</i>")
+    rows = [[B(text="📖 Help", callback_data="nav:help"), B(text="🎮 Menu", callback_data="nav:main")]]
     if brand.username():
         rows.insert(0, [B(text="➕ Add me to your group", url=brand.link("startgroup=true"))])
     return text, kb(rows)
@@ -236,7 +236,7 @@ def rules(topic: str | None = None) -> tuple[str, InlineKeyboardMarkup]:
     if page is None:
         text = (f"{brand.line()}\n📜 <b>Rules</b>\n{DIV}\nHow everything works, with the exact numbers. Pick a topic 👇")
         btns = [B(text=t, callback_data=f"rules:{k}") for k, t, _ in RULE_TOPICS]
-        return text, kb([btns[i:i + 2] for i in range(0, len(btns), 2)] + [[B(text="📖 Commands", callback_data="help:home")]])
+        return text, kb([btns[i:i + 2] for i in range(0, len(btns), 2)] + [[B(text="📖 Help", callback_data="help:home")]])
     return f"{brand.line()}\n\n{page()}", kb([[B(text="◀️ All rules", callback_data="rules:home")]])
 
 
@@ -562,10 +562,17 @@ def fun_help() -> tuple[str, InlineKeyboardMarkup]:
     return (f"{brand.line()}\n\n🎉 <b>Fun &amp; Social</b>\n\n/hug /slap /pat /poke /highfive /cuddle <i>(reply or @user)</i>\n"
             "/kiss /dance /wave /yeet … — see /actions for all of them\n/fish · /mine · /trivia — earn 💎 with mini-games\n/marry · /couple · /divorce 💍\n/date · /gift · /baby · /adopt · /family 👨‍👩‍👧‍👦\n/houses · /collect 🏠 · /familybonus\n"
             "/roast · /compliment · /rate · /choose · /iq · /lucky\n/ship — love calculator 💘\n/roll <i>2d6</i> — dice 🎲\n/8ball <i>question</i> 🎱\n/truth · /dare · /joke\n"
-            "\n👥 <b>Group tools</b>\n/waifu — your Waifu of the day · /afk <i>[reason]</i> — go away\n/whisper — secret message only one person can read (inline: @bot name text)\n"
-            "/tagall · /etagall — tag everyone (or @all) · /cancel\n/q — quote sticker (reply) · /members — what I know about the group\n"
-            "/welcomemsg · /leavemsg — admins: welcome / leaving message on or off\n🕹 Games: Arcade &amp; Social button · /games\n\n"
+            "\n👥 Whisper, tag-all, quote, afk, waifu… → <b>Group Tools</b> button · 🕹 all games → <b>Games</b> button\n\n"
             f"/ask <i>anything</i> — talk to {brand.name()} {brand.EMOJI} (or just say my name in a group!)"), kb([back()])
+
+
+def group_tools() -> tuple[str, InlineKeyboardMarkup]:
+    return (f"{brand.line()}\n\n👥 <b>Group Tools</b>\n\n/waifu — your Waifu of the day · /afk <i>[reason]</i> — go away\n"
+            "/whisper — secret message only one person can read (inline: @bot name text)\n"
+            "/tagall · /etagall — tag everyone (or @all / @eall) · /cancel — stop tagging\n"
+            "/q — quote sticker (reply to a message) · /members — what I know about the group\n"
+            "/welcomemsg · /leavemsg — admins: welcome / leaving message on or off\n\n"
+            "🛡 Admins: moderation commands are under the <b>Moderation</b> button.\n🕹 Games: the <b>Games</b> button · /games"), kb([back()])
 
 
 async def academy_help(uid: int) -> tuple[str, InlineKeyboardMarkup]:
