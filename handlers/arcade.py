@@ -49,7 +49,7 @@ GAME_INFO = {
           "/new (5 letters) · /new4 · /new5 · /new6 · /end · /wlb leaderboard · /myscore · /wordhelp",
     "wl": "🔠 <b>Wordly</b> (word scramble)\nUse the 8 given letters to make as many words as you can in 2 minutes - first to type a word gets it.\n/wordly or /wl · /end",
     "hk": "🔐 <b>Hack</b> (password cracking, bets 💎)\nCrack the secret code: 🔓 hacks = right digit, right place · ⚡ glitches = right digit, wrong place. Turn-based, winner takes the pot.\n"
-          "/hack3 · /hack4 · /hack5 · /hack6 <i>amount</i> · /joinhack · /end (host)",
+          "/hack3 · /hack4 · /hack5 · /hack6 <i>amount</i> · /joinhack · /hackdaily (daily code) · /hstats · /hlb · /end (host)",
     "wc": "⛓ <b>Word Chain</b> (groups, elimination)\nSay a word starting with the last letter of the previous word. Words get longer and the clock shorter - last one standing wins.\n"
           "Modes: /wc classic · /starthard · /startcfl · /startbl · /startrl · /startelim (see /wcmodes)\n"
           "/join · /flee · /forcestart · /forcejoin · /extend · /forceskip · /wcstatus · /wchelp · /wcstats · /wclb · /end",
@@ -80,7 +80,7 @@ async def hub(uid: int) -> tuple[str, InlineKeyboardMarkup]:
             "<b>👥 Group games</b> <i>(one game per chat at a time)</i>\n"
             "🔎 /new /new4 /new5 /new6 · /wlb · /myscore · /wordhelp — WordSeek word guessing\n"
             "🔠 /wordly (/wl) — make words from 8 letters\n"
-            "🔐 /hack3 /hack4 /hack5 /hack6 <i>amount</i> · /joinhack — crack the code, win the pot\n"
+            "🔐 /hack3-6 <i>amount</i> · /joinhack · /hackdaily · /hstats · /hlb — crack the code, win the pot\n"
             "⛓ /wc (+ /starthard /startelim …) · /join · /flee · /wcmodes · /wcstats · /wclb — Word Chain\n"
             "🐙 /jumble (/jum) · /jskip · /jlb · /jstats — unscramble words\n"
             "🎭 /charades (/describe) — describe it, the host rotates\n"

@@ -177,3 +177,30 @@ def test_jumble_is_in_help_but_not_in_the_slash_menu():
     assert "jum" in C.ALIASES["jumble"]
     games = dict(C.CATEGORIES)["🕹 Games"]
     assert all(c in games for c in ("jumble", "jlb", "jstats", "jskip"))
+
+
+def test_scramble_is_really_mixed_up():
+    rng = random.Random(5)
+    for key in ("easy", "medium", "hard", "extreme"):
+        for _ in range(150):
+            word, scr, _ans = D.new_puzzle(key, rng=rng)
+            assert sorted(scr) == sorted(word) and scr != word
+            assert D._fixed(word, scr) <= max(1, len(word) // 4), (word, scr)
+
+
+def test_is_word_for_near_miss():
+    assert D.is_word("house") and D.is_word(" House ") and not D.is_word("hoose") and not D.is_word("ab") and not D.is_word("h0use")
+
+
+def test_tile_picture():
+    from game.jumble_img import render_tiles
+    for w in ("cats", "house", "planet", "balance", "absolute"):
+        png = render_tiles(D.scramble(w), random.Random(1))
+        assert png[:8] == b"\x89PNG\r\n\x1a\n" and 5_000 < len(png) < 400_000
+
+
+def test_solo_summary():
+    assert S.solo_summary({}) is None and S.solo_summary({S.SOLO_BEST: 9}) is None        # no finished solo game yet
+    sm = S.solo_summary({S.SOLO_GAMES: 3, S.SOLO_WORDS: 12, S.SOLO_POINTS: 40, S.SOLO_BEST: 18})
+    assert sm == {"games": 3, "words": 12, "points": 40, "best": 18}
+    assert all(len(k) <= 32 for k in (S.SOLO_GAMES, S.SOLO_WORDS, S.SOLO_POINTS, S.SOLO_BEST))   # user_stats.key is String(32)

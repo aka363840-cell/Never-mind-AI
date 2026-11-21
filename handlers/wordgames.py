@@ -16,9 +16,9 @@ from aiogram.filters import Command, CommandObject, Filter
 from aiogram.types import CallbackQuery, InlineKeyboardButton as B, InlineKeyboardMarkup, Message, ReactionTypeEmoji, TelegramObject
 
 from database.models import User
-from game import hack as H, wordly as WL
+from game import hack as H, hack_stats as HS, wordly as WL
 from game.rules import R
-from services import economy, wordgames as svc
+from services import economy, hackstats as hs, wordgames as svc
 from services.errors import GameError
 from utils.fmt import esc, mention, num, parse_amount
 from utils.telegram import safe_answer
@@ -217,21 +217,27 @@ def _lobby_kb(g: svc.HackGame) -> InlineKeyboardMarkup:
 
 def _intro(g: svc.HackGame) -> str:
     ex = "0123456789"[: g.n]
-    return (f"🚀 <b>HACK {g.n} started!</b> Pot: <b>{num(g.pot)}</b> 💎\n\n"
-            f"I locked a secret code of <b>{g.n} different digits</b> (a 0 can be first).\n"
+    head = (f"🚀 <b>HACK {g.n} - practice</b> (free, no bet)" if g.solo else f"🚀 <b>HACK {g.n} started!</b> Pot: <b>{num(g.pot)}</b> 💎")
+    tail = ("Beat the code in as few tries as you can. /end to stop." if g.solo else
+            "Everybody sees every guess. <b>First to crack it takes the pot!</b> 🏆")
+    return (f"{head}\n\n"
+            f"I locked a secret code of <b>{g.n} different digits</b> (a 0 can be first, no digit repeats).\n"
             f"Send a code like <code>{ex}</code> on your turn and I tell you:\n"
             "🔓 <b>hacks</b> - right digit, right position\n⚡ <b>glitches</b> - right digit, wrong position\n\n"
             f"{H.max_guesses(g.n)} tries each · {H.TURN_S}s per turn · miss {H.MAX_FORFEIT} turns in a row and you're out.\n"
-            "Everybody sees every guess. <b>First to crack it takes the pot!</b> 🏆")
+            f"{tail}")
 
 
 def _board(g: svc.HackGame) -> str:
     rows = g.history[-10:]
     lines = [f"<code>{code}</code> 🔓{h} ⚡{gl} · {esc(name[:14])}" for name, code, h, gl in rows]
     older = len(g.history) - len(rows)
-    out = f"🔐 <b>HACK {g.n}</b> · pot <b>{num(g.pot)}</b> 💎\n\n"
+    out = f"🔐 <b>HACK {g.n}</b> · " + ("practice" if g.solo else f"pot <b>{num(g.pot)}</b> 💎") + "\n\n"
     if lines:
         out += (f"<i>… {older} earlier guesses</i>\n" if older else "") + "\n".join(lines) + "\n\n"
+    gone = H.eliminated(g.history)
+    if gone:
+        out += f"🚫 Not in the code: <code>{' '.join(gone)}</code>\n\n"
     cur = g.current()
     if cur is not None:
         out += (f"🎯 {mention(cur.uid, cur.name)} - your turn! Send a {g.n}-digit code.\n"
@@ -279,26 +285,49 @@ async def _hack_begin(bot: Bot, g: svc.HackGame) -> None:
     await _prompt(bot, g)
 
 
-async def _hack_finish(bot: Bot, g: svc.HackGame, winner: svc.HackPlayer | None, title: str, reply_to: Message | None = None) -> None:
-    """End the game: pay the winner, or refund everybody when there is none. Caller holds g.lock."""
+def _win_title(win: list) -> str:
+    if len(win) == 1:
+        p = win[0]
+        return f"🎉 <b>{mention(p.uid, p.name)}</b> cracked the code in <b>{p.guesses}</b> {'try' if p.guesses == 1 else 'tries'}!"
+    names = " & ".join(f"<b>{mention(p.uid, p.name)}</b>" for p in win)
+    return f"🤝 {names} cracked the code in <b>{win[0].guesses}</b> tries - it's a tie!"
+
+
+async def _hack_finish(bot: Bot, g: svc.HackGame, winners, title: str, reply_to: Message | None = None,
+                       cracked: bool = False, record: bool = True) -> None:
+    """End the game: pay the winner(s) (a tie splits the pot), or refund everybody when there is none. Practice games move no diamonds.
+    `winners` = one HackPlayer, a list of them, or None. `cracked` = the winner cracked the code (not "last one standing");
+    `record` = count it in the players' Hack stats (not for a game the host ended). Caller holds g.lock."""
     if svc.HACK.get(g.chat_id) is g:
         del svc.HACK[g.chat_id]
     g.phase, g.token = "done", g.token + 1
     _cancel(g.task)
+    win = [winners] if isinstance(winners, svc.HackPlayer) else list(winners or [])
     recent = "\n".join(f"<code>{code}</code> 🔓{h} ⚡{gl} · {esc(name[:14])}" for name, code, h, gl in g.history[-6:])
     code = f"🔑 The code was <code>{g.secret}</code>\n" if g.secret else ""
-    if winner is not None:
+    if win and g.solo:
+        text = f"{title}\n\n{code}"
+    elif win:
         try:
-            prize = await svc.pay_winner(g, winner.uid)
-            text = f"{title}\n\n{code}💰 <b>{mention(winner.uid, winner.name)}</b> takes the pot: <b>+{num(prize)}</b> 💎"
+            shares = await svc.pay_winners(g, [p.uid for p in win])
+            lines = "\n".join(f"💰 <b>{mention(p.uid, p.name)}</b> takes <b>+{num(a)}</b> 💎" for p, a in zip(win, shares))
+            text = f"{title}\n\n{code}{lines}"
         except Exception:
             log.exception("hack payout failed - refunding")
             await svc.refund_all(g)
             text = f"⚠️ The payout failed, so every bet was refunded.\n\n{code}"
     else:
-        await svc.refund_all(g)
-        text = f"{title}\n\n{code}💸 Every bet was refunded ({num(g.bet)} 💎 each)."
-    text += ("\n\n" + recent) if recent and winner is not None else ""
+        await svc.refund_all(g)                                 # bet 0 (practice) -> nothing to give back
+        text = f"{title}\n\n{code}" + ("" if g.solo else f"💸 Every bet was refunded ({num(g.bet)} 💎 each).")
+    text += ("\n\n" + recent) if recent and win else ""
+    if record and g.secret and not g.solo:                      # lifetime stats / ranks (best effort: never blocks the result)
+        try:
+            wins = await hs.record_game([p.uid for p in g.players], win[0].uid if win else None, win[0].guesses if win and cracked else None)
+            if win and wins and HS.rank_for(wins - 1) != HS.rank_for(wins):
+                em, title_ = HS.rank_for(wins)
+                text += f"\n\n🎖 <b>{esc(win[0].name)}</b> ranked up: {em} <b>{title_}</b>!"
+        except Exception:
+            log.exception("hack stats failed")
     old = g.board_msg
     try:
         await (reply_to.reply(text) if reply_to is not None else bot.send_message(g.chat_id, text))
@@ -342,7 +371,9 @@ async def _turn_timer(bot: Bot, g: svc.HackGame, token: int) -> None:
             else:
                 note = f"⏭ <b>{esc(cur.name)}</b> ran out of time - turn skipped ({cur.skips}/{H.MAX_FORFEIT})."
             left = g.active()
-            if len(left) == 1:
+            if g.solo and not left:
+                await _hack_finish(bot, g, None, f"{note}\n\n🛑 Practice ended.")
+            elif not g.solo and len(left) == 1:
                 await _hack_finish(bot, g, left[0], f"{note}\n\n🏁 <b>{esc(left[0].name)}</b> is the last hacker standing!")
             elif g.next_player() is None:
                 await _hack_finish(bot, g, None, f"{note}\n\n💀 <b>Nobody cracked the code.</b>")
@@ -365,13 +396,18 @@ async def _hack_guess(m: Message, bot: Bot, g: svc.HackGame) -> bool:
         if svc.HACK.get(g.chat_id) is not g or g.phase != "play" or cur is None or cur.uid != uid:
             return False
         code = m.text.strip()
+        if H.has_repeats(code):                                 # the code never repeats a digit: no try is used, the turn timer keeps running
+            await m.reply("🔁 The code never repeats a digit - send a different one (no try used).")
+            return True
+        if any(c == code for _, c, _, _ in g.history):
+            await m.reply("♻️ That code was already tried - look at the board and send a new one (no try used).")
+            return True
         hacks, glitches = H.score(g.secret, code)
         cur.guesses += 1
         cur.skips = 0
         g.history.append((cur.name, code, hacks, glitches))
         if hacks == g.n:
-            await _hack_finish(bot, g, cur, f"🎉 <b>{mention(cur.uid, cur.name)}</b> cracked the code in <b>{cur.guesses}</b> "
-                                            f"{'try' if cur.guesses == 1 else 'tries'}!", reply_to=m)
+            await _hack_finish(bot, g, cur, _win_title([cur]), reply_to=m, cracked=True)
         elif g.next_player() is None:
             await _hack_finish(bot, g, None, "💀 <b>Everybody is out of tries - nobody cracked the code.</b>", reply_to=m)
         else:
@@ -392,13 +428,33 @@ async def _join(bot: Bot, g: svc.HackGame, uid: int, name: str) -> None:
         await _update_lobby(bot, g)
 
 
+async def _solo(m: Message, bot: Bot, user: User, n: int) -> None:
+    """Free practice in a private chat: one player, no bet, no pot, nothing is paid or refunded."""
+    chat = m.chat.id
+    if user.id in hs.DAILY:
+        raise GameError("📅 You have an open daily Hack - finish it, or send /hackdaily stop first.")
+    await _reap(chat)
+    what = svc.running(chat) or await svc.busy(chat)
+    if what:
+        raise GameError(_busy_text(what))
+    g = svc.HackGame(chat, svc.new_gid(), n, 0, user.id, solo=True)
+    g.players.append(svc.HackPlayer(user.id, m.from_user.full_name[:30]))
+    svc.HACK[chat] = g                                          # reserved before any further await
+    try:
+        async with g.lock:
+            await _hack_begin(bot, g)
+    except BaseException:
+        svc.HACK.pop(chat, None)
+        raise
+
+
 @router.message(Command("hack3", "hack4", "hack5", "hack6"))
 async def hack_cmd(m: Message, command: CommandObject, bot: Bot, db_user: User):
     if m.from_user is None:
         return
     n = int((command.command or "hack4")[-1])
     if m.chat.type == "private":
-        raise GameError("🔐 Hack is played against friends - start it in a group chat!")
+        return await _solo(m, bot, db_user, n)                  # free practice against the bot
     args = (command.args or "").split()
     if not args:
         raise GameError(f"🔐 Usage: /hack{n} &lt;amount&gt; - e.g. /hack{n} 500 (everybody who joins bets the same)")
@@ -469,6 +525,156 @@ async def hack_cb(cb: CallbackQuery, bot: Bot, db_user: User):
         await safe_answer(cb)
 
 
+# ============================================================================== 📊 stats, 🏆 leaderboard, 📅 daily code
+def _left(seconds: int) -> str:
+    h, m = divmod(max(0, seconds) // 60, 60)
+    return f"{h}h {m}m" if h else f"{m}m"
+
+
+def _daily_intro(d: hs.DailyGame) -> str:
+    top = HS.daily_reward(1, 0, d.n)[0]
+    return (f"📅 <b>DAILY HACK</b> - one secret code, the same for everybody today!\n\n"
+            f"I locked a code of <b>{d.n} different digits</b> (a 0 can be first). Send a code like <code>{'0123456789'[: d.n]}</code>:\n"
+            "🔓 <b>hacks</b> - right digit, right position\n⚡ <b>glitches</b> - right digit, wrong position\n\n"
+            f"<b>{H.max_guesses(d.n)}</b> tries, no timer, no bet. Crack it for 💎 <b>{HS.DAILY_BASE}</b> + <b>{HS.DAILY_PER_TRY}</b> per unused try "
+            f"(up to <b>{top}</b>), +5 % per day of streak. Don't share the code - it's the same for everyone! 🤫\n"
+            f"/hackdaily stop pauses (your tries are saved) · new code in {_left(hs.seconds_to_reset())}")
+
+
+def _daily_board(d: hs.DailyGame) -> str:
+    rows = HS.history_rows(d.secret, d.guesses)
+    out = f"📅 <b>DAILY HACK</b> · {d.n}-digit code · {d.day:%d %b}\n\n"
+    if rows:
+        out += "\n".join(f"<code>{g}</code> 🔓{h_} ⚡{gl}" for _, g, h_, gl in rows) + "\n\n"
+    gone = H.eliminated(rows)
+    if gone:
+        out += f"🚫 Not in the code: <code>{' '.join(gone)}</code>\n\n"
+    return out + f"🎯 Tries left: <b>{H.max_guesses(d.n) - len(d.guesses)}</b> · new code in {_left(hs.seconds_to_reset())}"
+
+
+async def _daily_solved(m: Message, d: hs.DailyGame) -> None:
+    """The player cracked today's code: pay the reward once and show the result. Caller holds d.lock (or has no concurrent guesses)."""
+    hs.DAILY.pop(d.uid, None)
+    tries = len(d.guesses)
+    text = f"🎉 <b>Cracked!</b> Today's code <code>{d.secret}</code> in <b>{tries}</b> {'try' if tries == 1 else 'tries'}!\n\n"
+    try:
+        amount, streak, bonus = await hs.pay_daily(d.uid, d.day, tries)
+        if amount:
+            text += f"💎 <b>+{num(amount)}</b>" + (f" · 🔥 {streak}-day streak (+{bonus} %)" if streak >= 2 else "") + "\n"
+        else:
+            text += "💎 Your reward for today was already paid.\n"
+    except Exception:
+        log.exception("daily hack payout failed")
+        text += "⚠️ The reward could not be paid right now - send /hackdaily again in a minute to collect it.\n"
+        hs.DAILY.pop(d.uid, None)
+    text += f"\n🏆 /hlb daily - today's fastest · new code in {_left(hs.seconds_to_reset())}"
+    await m.reply(text)
+
+
+async def _daily_guess(m: Message, d: hs.DailyGame) -> bool:
+    """True = the message was a guess at the daily code (and must not reach other handlers)."""
+    day = hs.today()
+    if d.day != day:                                            # midnight (UTC) passed while the attempt was open
+        hs.DAILY.pop(d.uid, None)
+        await m.reply("🌅 A new daily code is out! Send /hackdaily to start it.")
+        return True
+    code = m.text.strip()
+    async with d.lock:
+        if hs.DAILY.get(d.uid) is not d:
+            return False
+        if H.has_repeats(code):
+            await m.reply("🔁 The code never repeats a digit - send a different one (no try used).")
+            return True
+        if code in d.guesses:
+            await m.reply("♻️ You already tried that one (no try used).")
+            return True
+        d.guesses.append(code)
+        await hs.save_guesses(d.uid, day, d.guesses)
+        if code == d.secret:
+            await _daily_solved(m, d)
+        elif len(d.guesses) >= H.max_guesses(d.n):
+            hs.DAILY.pop(d.uid, None)
+            await hs.mark_failed(d.uid, day)
+            await m.reply(_daily_board(d) + "\n\n💀 <b>Out of tries.</b> The code stays secret until tomorrow - come back for the next one!")
+        else:
+            await m.reply(_daily_board(d))
+    return True
+
+
+@router.message(Command("hackdaily"))
+async def hackdaily_cmd(m: Message, command: CommandObject, db_user: User):
+    if m.from_user is None:
+        return
+    if m.chat.type != "private":
+        raise GameError("📅 The daily code is played in a private chat, so nobody sees your guesses. Open a chat with me and send /hackdaily")
+    uid, day = db_user.id, hs.today()
+    if (command.args or "").strip().lower() == "stop":
+        hs.DAILY.pop(uid, None)
+        await m.reply("⏸ Daily Hack paused - your tries are saved. Send /hackdaily to continue.")
+        return
+    if svc.HACK.get(m.chat.id) is not None:
+        raise GameError("🔐 You have a practice game running - finish it or /end it first.")
+    tries = await hs.solved_today(uid, day)
+    if tries:
+        raise GameError(f"✅ You already cracked today's code in <b>{tries}</b> {'try' if tries == 1 else 'tries'}. New code in {_left(hs.seconds_to_reset())} · /hlb daily")
+    if await hs.has_failed(uid, day):
+        raise GameError(f"💀 You're out of tries for today's code. New code in {_left(hs.seconds_to_reset())}.")
+    d = hs.DAILY.get(uid)
+    if d is None or d.day != day:
+        d = hs.DailyGame(uid, day, hs.secret_for(day), await hs.load_guesses(uid, day), lock=asyncio.Lock())
+        hs.DAILY[uid] = d
+    if d.secret in d.guesses:                                   # solved, but the payout failed earlier: collect it now
+        async with d.lock:
+            await _daily_solved(m, d)
+        return
+    await m.answer(_daily_board(d) if d.guesses else _daily_intro(d))
+
+
+@router.message(Command("hstats"))
+async def hstats_cmd(m: Message):
+    if m.from_user is None:
+        return
+    target = m.from_user
+    rep_ = m.reply_to_message
+    if rep_ is not None and rep_.from_user is not None and not rep_.from_user.is_bot:
+        target = rep_.from_user
+    sm = await hs.user_summary(target.id)
+    solved = await hs.daily_solved_count(target.id)
+    if sm["play"] == 0 and solved == 0:
+        raise GameError(f"🔐 {esc(target.full_name)} has no Hack stats yet - play a group game with /hack4 &lt;amount&gt; or try /hackdaily in a private chat!")
+    em, title = sm["rank"]
+    out = f"🔐 <b>{esc(target.full_name)}</b> - Hack stats\n\n🎖 <b>{em} {title}</b>"
+    if sm["next"]:
+        out += f" · {sm['next'][0]} more {'win' if sm['next'][0] == 1 else 'wins'} to {sm['next'][1]}"
+    out += f"\n🏆 Wins: <b>{sm['win']}</b> · 🎮 Games: <b>{sm['play']}</b> · 📈 Win rate: <b>{sm['rate']} %</b>"
+    if sm["avg_tries"] is not None:
+        out += f"\n🔓 Cracks: <b>{sm['avg_tries']}</b> tries on average" + (f" · fastest <b>{sm['fast']}</b>" if sm["fast"] else "")
+    streak = await hs.daily_streak(target.id, hs.today())
+    out += f"\n📅 Daily codes solved: <b>{solved}</b>" + (f" · 🔥 {streak}-day streak" if streak else "")
+    await m.reply(out)
+
+
+@router.message(Command("hlb"))
+async def hlb_cmd(m: Message, command: CommandObject):
+    args = [a.lower() for a in (command.args or "").split()]
+    if "daily" in args:
+        rows = await hs.daily_board(hs.today())
+        if not rows:
+            raise GameError("📅 Nobody has cracked today's daily code yet - be the first! Send /hackdaily in a private chat with me.")
+        lines = [f"{MEDALS[i] if i < 3 else f'<b>{i + 1}.</b>'} <b>{esc(name[:20])}</b> - <b>{tries}</b> {'try' if tries == 1 else 'tries'}"
+                 for i, (_uid, name, tries) in enumerate(rows)]
+        await m.reply("📅 <b>Daily Hack</b> · today's fastest crackers\n\n" + "\n".join(lines) + "\n\n<i>/hackdaily in a private chat · /hlb for all-time wins</i>")
+        return
+    rows = await hs.leaderboard()
+    if not rows:
+        raise GameError("🔐 No Hack wins yet - win a group game with /hack4 &lt;amount&gt; to get on the board!")
+    lines = []
+    for i, (_uid, name, wins, plays) in enumerate(rows):
+        em, title = HS.rank_for(wins)
+        lines.append(f"{MEDALS[i] if i < 3 else f'<b>{i + 1}.</b>'} <b>{esc(name[:20])}</b> {em} {title} - <b>{wins}</b> {'win' if wins == 1 else 'wins'} · {plays} games")
+    await m.reply("🏆 <b>Hack leaderboard</b> · all time\n\n" + "\n".join(lines) + "\n\n<i>/hlb daily - today's daily code · /hstats - your rank</i>")
+
+
 # ============================================================================== /end
 class _HasGame(Filter):
     """True while Wordly or Hack runs in the chat - otherwise /end falls through to WordSeek's own /end."""
@@ -487,7 +693,7 @@ async def end_cmd(m: Message, bot: Bot):
             raise GameError("⛔ Only the host can end the Hack game.")
         async with h.lock:
             if svc.HACK.get(m.chat.id) is h:
-                await _hack_finish(bot, h, None, "🛑 <b>Hack ended by the host.</b>", reply_to=m)
+                await _hack_finish(bot, h, None, "🛑 <b>Hack ended by the host.</b>", reply_to=m, record=False)
         return
     w = svc.WORDLY.get(m.chat.id)
     if w is not None:
@@ -510,6 +716,10 @@ class WordGamesMiddleware(BaseMiddleware):
                 h = svc.HACK.get(event.chat.id)
                 if h is not None and h.phase == "play" and H.is_guess(event.text, h.n) and await _hack_guess(event, data["bot"], h):
                     return None
+                if event.chat.type == "private":                # an open daily attempt: a code of the right length is a guess
+                    d = hs.DAILY.get(event.from_user.id)
+                    if d is not None and H.is_guess(event.text, d.n) and await _daily_guess(event, d):
+                        return None
         except Exception:
             log.exception("wordly/hack move failed")
         return await handler(event, data)

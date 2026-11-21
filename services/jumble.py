@@ -59,6 +59,8 @@ class JumbleGame:
     created: float = field(default_factory=time.time)
     setup_msg: int | None = None                           # the setup / lobby message
     msg_id: int | None = None                              # the one round message (edited: puzzle -> hint -> result)
+    photo: bool = False                                    # the round message is a picture of letter tiles (edit its caption, not its text)
+    near: set = field(default_factory=set)                 # players already cheered on for a real-but-wrong word this round
     solved: asyncio.Event | None = None
     task: asyncio.Task | None = None
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
@@ -250,3 +252,48 @@ async def user_stats(uid: int) -> dict:
     days = {c.date() for _, c, _ in rows}
     return {"stat": stat, "streak": S.streak_from_days(days, today),
             "earned_today": sum(int(a) for _, c, a in rows if c.date() == today)}
+
+
+# ============================================================== solo (private chat): personal bests
+async def record_solo(g: JumbleGame) -> dict[int, tuple[int, int, bool]]:
+    """A finished PRIVATE game pays nothing and isn't on the group boards, but it keeps the player's own counters:
+    games, words, points and their best single game. -> {uid: (points, previous best, is a new personal best)} for players who scored."""
+    if g.chat_id <= 0:
+        return {}
+    from database.session import db
+    from services import gamestats, realm
+    out: dict[int, tuple[int, int, bool]] = {}
+    scored = [(uid, r[1], r[2]) for uid, r in g.scores.items() if r[1] > 0]
+    if not scored:
+        return {}
+    async with db.tx() as s:
+        for uid, pts, words in scored:
+            before = await realm.stat(s, uid, S.SOLO_BEST)
+            await realm.bump(s, uid, S.SOLO_GAMES)
+            await realm.bump(s, uid, S.SOLO_WORDS, words)
+            await realm.bump(s, uid, S.SOLO_POINTS, pts)
+            new_best = await gamestats.set_best(s, uid, S.SOLO_BEST, pts)
+            out[uid] = (pts, before, new_best)
+    return out
+
+
+async def solo_stats(uid: int) -> dict | None:
+    from services import realm
+    return S.solo_summary(await realm.stats_of(uid))
+
+
+async def solo_leaderboard(limit: int = 10) -> list[tuple[int, str, int, int]]:
+    """Best single solo games -> [(uid, name, best points, solo games)]."""
+    from sqlalchemy import select
+    from database.models import User, UserStat
+    from database.session import db
+    async with db.tx() as s:
+        rows = (await s.execute(
+            select(UserStat.user_id, User.first_name, UserStat.value).join(User, User.id == UserStat.user_id)
+            .where(UserStat.key == S.SOLO_BEST, UserStat.value > 0, User.is_flagged == False, User.is_banned == False)  # noqa: E712
+            .order_by(UserStat.value.desc(), UserStat.user_id).limit(limit))).all()
+        games = {}
+        if rows:
+            games = {u: v for u, v in (await s.execute(
+                select(UserStat.user_id, UserStat.value).where(UserStat.key == S.SOLO_GAMES, UserStat.user_id.in_([r[0] for r in rows])))).all()}
+    return [(r[0], r[1], r[2], games.get(r[0], 0)) for r in rows]

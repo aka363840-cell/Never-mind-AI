@@ -38,8 +38,17 @@ Listed in `/help` (Games) but **not** in Telegram's "/" command menu.
 * Money safety: every change goes through `economy.apply` with idempotency refs (`jumblebet:<game>:b|r|w:<user>`); the payout is one transaction; `services.jumble.recover_orphans()` runs at boot and refunds entry fees of a game that a restart interrupted.
 
 ## Other details
+* **Puzzle picture:** each word is posted as a picture of letter tiles (`game/jumble_img.py`, Pillow + the bundled Poppins font), so it can't be copied into an anagram solver. Hints and results edit the picture's caption. If the picture can't be made or sent, the puzzle falls back to plain text and the game goes on.
+* **Real scrambles:** at most `len/4` letters (min. 1) may stay in their original place, so the word never half shows (`game/jumble.py: scramble`).
+* **Close-but-wrong:** a real word of the right length that isn't an answer gets one 🤔 reaction per player and round.
 * Words: WordSeek dictionary (`game/wordseek_data.py`) + `game/jumble_words.py` (themes and 7-8 letter words; add words there - `tests/test_jumble_pure.py` checks them).
 * Games live in memory (`services/jumble.py: GAMES`). A restart drops a free game (paid games are refunded at boot).
 * One game per chat: Jumble, Wordly, Hack and WordSeek block each other - `/end` the running one first.
 * Plain-message answers need the bot to receive normal group messages (privacy mode off, or the bot is an admin) - same as WordSeek.
 * Tuning knobs: `game/jumble.py` (`ROUND_CHOICES`, `TARGET_CHOICES`, `DIFFS`, `SPEEDS`, `ENTRY_CHOICES`, `LOBBY_S`, `BREAK_S`, `IDLE_ROUNDS`) and `game/jumble_stats.py` (rewards).
+
+## Solo mode (private chat)
+
+* `/jumble` in a private chat is a solo game: still no reward and not on the group leaderboards (so nothing can be farmed), but the player now keeps **personal records** in `user_stats`: `jumble_solo_games`, `jumble_solo_words`, `jumble_solo_pts` and `jumble_solo_best` (best points in one game).
+* The result message says "🏅 New personal best" or shows the current best; `/jstats` gets a 🎯 Solo section; `/jlb solo` is the board of best solo games.
+

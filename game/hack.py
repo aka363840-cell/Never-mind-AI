@@ -33,3 +33,19 @@ def score(secret: str, guess: str) -> tuple[int, int]:
     hacks = sum(a == b for a, b in zip(secret, guess))
     common = sum(min(secret.count(d), guess.count(d)) for d in set(guess))
     return hacks, common - hacks
+
+
+def has_repeats(code: str) -> bool:
+    """The secret never repeats a digit, so a guess that does can only waste a try."""
+    return len(set(code)) != len(code)
+
+
+def eliminated(history) -> list[str]:
+    """Digits that are certainly NOT in the code: every digit of a guess that scored 0 hacks and 0 glitches.
+    `history` rows are (name, guess, hacks, glitches)."""
+    out: set[str] = set()
+    for _name, guess, hacks, glitches in history:
+        if hacks == 0 and glitches == 0:
+            out.update(guess)
+    return sorted(out)
+

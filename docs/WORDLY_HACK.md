@@ -32,10 +32,22 @@ Crack the secret password! Each guess gives you **hacks** (right digit, right po
 * The code has all-different digits (a leading 0 is possible). Players guess in turn by typing the code in the chat; every guess is public.
 * 8 / 10 / 12 / 14 tries per player for 3 / 4 / 5 / 6 digits, 45 s per turn. Miss 2 turns in a row and you are out (your bet stays in the pot).
 * First to crack it wins the whole pot (`game/hack.py: FEE_PCT` = house fee, default 0). If nobody cracks it, or the host ends the game, every bet is refunded.
-* Money: bets, payout and refunds all go through `economy.apply` with idempotency refs (`hack:<gid>:b|win|r:<uid>`). Games live in memory, so
+* **No wasted tries:** a guess with a repeated digit (the code never repeats one) or a code that was already tried is rejected and costs no try.
+* **Digit tracker:** the board lists the digits that are certainly not in the code (every digit of a guess that scored 0 hacks and 0 glitches).
+* **Practice:** `/hack3`-`/hack6` in a private chat starts a free solo game against the bot (no bet, no pot, nothing paid or refunded).
+* Money: bets, payout and refunds all go through `economy.apply` with idempotency refs (`hack:<gid>:b|win|r:<uid>`; a tied win is `hack:<gid>:win:<uid>`). Games live in memory, so
   `services.wordgames.recover_orphans()` runs at boot and refunds the bets of any game that was interrupted by a restart. No new tables.
 
 ## Notes
 * One game per chat: Wordly, Hack and WordSeek block each other (`/end` the running one first).
 * `/end` is shared with WordSeek: if a Wordly/Hack game is running it ends that one, otherwise it is WordSeek's `/end` as before.
 * As with WordSeek, plain-message guesses need the bot to see normal group messages (privacy mode off, or the bot is an admin).
+
+## Hack stats, ranks and the daily code
+
+* **Stats** (`/hstats`, reply to see someone else's) and **leaderboard** (`/hlb`, all-time wins). Lifetime counters live in the existing `user_stats` table (`hack_play`, `hack_win`, `hack_crack`, `hack_tries`, `hack_fast`) - no new tables, no migration. Only finished **group** games count (a game the host ended, practice games and the daily code don't), so ranks can't be farmed solo.
+* **Ranks** by wins (`game/hack_stats.py: RANKS`): 🐣 Script Kiddie → 📡 Packet Sniffer (3) → 🎩 Black Hat (10) → 🔓 Cipher Breaker (25) → 💥 Zero-Day (50) → 👑 Elite Hacker (100). A rank-up is announced in the game result.
+* **Daily code** (`/hackdaily`, private chat only): one secret 4-digit code, the same for everybody for a UTC day, derived from a hash of the bot token + date (reading the source can't reveal it). One attempt per day, 10 tries, no timer, no bet. Solving pays `DAILY_BASE` (100) + `DAILY_PER_TRY` (25) per unused try, +5 % per day of streak (max +50 %) - once per day: ledger kind `hack_daily`, ref `hackdaily:<YYYYMMDD>:<uid>` (a replay is a no-op), meta `{"tries": n}`. That ledger row is also the record of the solve (streak, `/hlb daily`, `/hstats`).
+* Progress of an open attempt is kept in the KV layer (`hd:g:<day>:<uid>`; Redis if configured, else memory), so `/hackdaily stop` and a restart (with Redis) keep the tries. A failed day is marked `hd:f:<day>:<uid>`. If a solve's payout fails, `/hackdaily` collects it. The code of a failed day is never revealed.
+* `/hlb daily` shows today's fastest solvers (fewest tries, earlier solve breaks ties).
+

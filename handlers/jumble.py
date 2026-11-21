@@ -3,7 +3,7 @@ Deliberately NOT in the Telegram "/" menu (they are listed in /help, Games).
 
 /jumble or /jum   start a new game: pick mode (rounds / race), difficulty, speed, theme and entry fee with the buttons, then Start
 /jskip            vote to skip the current word
-/jlb              leaderboard: /jlb [global|group] [today|week|month|all]
+/jlb              leaderboard: /jlb [global|group] [today|week|month|all] · /jlb solo = best solo (private chat) games
 /jstats           your Jumble stats and daily streak (reply to someone to see theirs)
 /end              end the running Jumble (the player who started it, or a group admin); when no Jumble runs,
                   /end falls through to Wordly / Hack / WordSeek exactly as before
@@ -18,9 +18,10 @@ from typing import Any, Awaitable, Callable
 from aiogram import BaseMiddleware, Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandObject, Filter
-from aiogram.types import CallbackQuery, InlineKeyboardButton as B, InlineKeyboardMarkup, Message, ReactionTypeEmoji, TelegramObject
+from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton as B, InlineKeyboardMarkup, Message, ReactionTypeEmoji, TelegramObject
 
 from game import jumble as D, jumble_stats as S
+from game.jumble_img import render_tiles
 from services import jumble as svc
 from services.errors import GameError
 from utils.fmt import esc, mention, num
@@ -190,7 +191,7 @@ def _standings(g: svc.JumbleGame) -> str:
 
 
 def _puzzle_text(g: svc.JumbleGame) -> str:
-    out = f"{_head(g)}\n\n<code>{D.show(g.scrambled)}</code>\n"
+    out = f"{_head(g)}\n\n" + ("" if g.photo else f"<code>{D.show(g.scrambled)}</code>\n")
     if g.hints:
         out += f"💡 <code>{D.hint(g.word, g.hints)}</code>\n"
     out += f"\nUnscramble the word! ⏱ <b>{g.rtime}s</b> · /jskip to skip"
@@ -443,7 +444,10 @@ async def _edit_round(bot: Bot, g: svc.JumbleGame, text: str) -> None:
     """Edit the one round message (puzzle -> hint -> result); if it vanished, post it again."""
     if g.msg_id:
         try:
-            await bot.edit_message_text(text, chat_id=g.chat_id, message_id=g.msg_id)
+            if g.photo:
+                await bot.edit_message_caption(chat_id=g.chat_id, message_id=g.msg_id, caption=text)
+            else:
+                await bot.edit_message_text(text, chat_id=g.chat_id, message_id=g.msg_id)
             return
         except TelegramBadRequest as e:
             if "not modified" in str(e).lower():
@@ -451,10 +455,33 @@ async def _edit_round(bot: Bot, g: svc.JumbleGame, text: str) -> None:
         except Exception:
             pass
     try:
+        g.photo = False                                        # a re-posted message is plain text
         msg = await bot.send_message(g.chat_id, text)
         g.msg_id = msg.message_id
     except Exception:
         pass
+
+
+async def _send_puzzle(bot: Bot, g: svc.JumbleGame) -> Message:
+    """Post the puzzle as a picture of letter tiles (a picture can't be pasted into an anagram solver). If the picture can't be
+    made or sent, fall back to the plain text puzzle so the game never stops. Caller holds g.lock."""
+    g.photo = True
+    try:
+        img = await asyncio.to_thread(render_tiles, g.scrambled)
+        return await bot.send_photo(g.chat_id, BufferedInputFile(img, filename="jumble.png"), caption=_puzzle_text(g))
+    except Exception:
+        log.warning("jumble: tile picture failed - posting the puzzle as text", exc_info=True)
+        g.photo = False
+        return await bot.send_message(g.chat_id, _puzzle_text(g))
+
+
+async def _near_miss(m: Message, g: svc.JumbleGame) -> None:
+    """A real word of the right length that is not an answer: one 🤔 per player and round, so they know the bot saw it."""
+    uid = m.from_user.id
+    if uid in g.near or (g.entry and uid not in g.players) or not D.is_word(m.text):
+        return
+    g.near.add(uid)
+    await _react(m, "🤔")
 
 
 async def _run(bot: Bot, g: svc.JumbleGame) -> None:
@@ -471,12 +498,12 @@ async def _run(bot: Bot, g: svc.JumbleGame) -> None:
                 if svc.GAMES.get(g.chat_id) is not g:
                     return
                 g.round_no, g.rdiff, g.rtime, g.hints = i, key, time_s, 0
-                g.skip_votes, g.skipped, g.winner = set(), False, None
+                g.skip_votes, g.skipped, g.winner, g.near = set(), False, None, set()
                 g.word, g.scrambled, g.answers = D.new_puzzle(key, g.theme, g.used)
                 g.used.add(g.word)
                 g.solved = asyncio.Event()
                 old = g.msg_id
-                msg = await bot.send_message(g.chat_id, _puzzle_text(g))
+                msg = await _send_puzzle(bot, g)
                 g.msg_id = msg.message_id
                 g.started = svc.now()
                 g.open = True
@@ -565,7 +592,15 @@ async def _finish(bot: Bot, g: svc.JumbleGame, title: str, refund: bool = False)
         paid = await svc.record_results(g)
     except Exception:
         log.exception("jumble rewards failed")
-    await bot.send_message(g.chat_id, _final_text(g, title, reveal, paid, pot_text), reply_markup=_again_kb())
+    solo_text = ""
+    if g.chat_id > 0:                                          # private chat = solo: no reward, but a personal best
+        try:
+            for pts, before, new_best in (await svc.record_solo(g)).values():
+                solo_text = (f"\n\n🏅 <b>New personal best: {pts} pts!</b>" + (f" (before: {before})" if before else "")) if new_best \
+                    else f"\n\n🏅 Your best solo game: <b>{before}</b> pts · /jlb solo"
+        except Exception:
+            log.exception("jumble solo stats failed")
+    await bot.send_message(g.chat_id, _final_text(g, title, reveal, paid, pot_text) + solo_text, reply_markup=_again_kb())
     await _delete(bot, g.chat_id, g.msg_id)
 
 
@@ -673,6 +708,14 @@ async def _name(bot: Bot, uid: int, chat_id: int) -> str:
 @router.message(Command("jlb"))
 async def jlb_cmd(m: Message, command: CommandObject, bot: Bot):
     args = [a.lower() for a in (command.args or "").split()]
+    if "solo" in args:                                         # best single solo (private chat) games
+        rows = await svc.solo_leaderboard()
+        if not rows:
+            raise GameError("🐙 No solo scores yet - play /jumble in a private chat with me to set a personal best!")
+        lines = [f"{MEDALS[i] if i < 3 else f'<b>{i + 1}.</b>'} <b>{esc(name[:20])}</b> - best <b>{best}</b> pts · {games} solo {'game' if games == 1 else 'games'}"
+                 for i, (_uid, name, best, games) in enumerate(rows)]
+        await m.reply("🎯 <b>Jumble solo - personal bests</b>\n\n" + "\n".join(lines) + "\n\n<i>Play /jumble in a private chat · /jlb for group scores</i>")
+        return
     glob = "global" in args or m.chat.type == "private"
     period = next((a for a in args if a in S.PERIODS), "week")
     rows = await svc.leaderboard(None if glob else m.chat.id, period)
@@ -697,15 +740,21 @@ async def jstats_cmd(m: Message, bot: Bot):
         target = rep.from_user
     info = await svc.user_stats(target.id)
     st = info["stat"]
-    if st.games == 0:
-        raise GameError(f"🐙 {esc(target.full_name)} has no Jumble stats yet - play a group game with /jumble!")
-    streak = info["streak"]
-    await m.reply(f"🐙 <b>{esc(target.full_name)}</b> - Jumble stats\n\n"
-                  f"⭐ Points: <b>{num(st.points)}</b> · 📝 Words: <b>{num(st.words)}</b>\n"
-                  f"🎮 Games: <b>{st.games}</b> · 🏆 Wins: <b>{st.wins}</b>\n"
-                  f"🔥 Streak: <b>{streak}</b> {'day' if streak == 1 else 'days'}"
-                  + (f" (+{min(streak, S.STREAK_MAX_DAYS) * S.STREAK_STEP_PCT} % reward)" if streak else "") + "\n"
-                  f"💎 Earned today: <b>{num(info['earned_today'])}</b> / {num(S.DAILY_REWARD_CAP)}")
+    solo = await svc.solo_stats(target.id)
+    if st.games == 0 and solo is None:
+        raise GameError(f"🐙 {esc(target.full_name)} has no Jumble stats yet - play a group game with /jumble, or a solo game in a private chat!")
+    out = f"🐙 <b>{esc(target.full_name)}</b> - Jumble stats"
+    if st.games:
+        streak = info["streak"]
+        out += (f"\n\n⭐ Points: <b>{num(st.points)}</b> · 📝 Words: <b>{num(st.words)}</b>\n"
+                f"🎮 Games: <b>{st.games}</b> · 🏆 Wins: <b>{st.wins}</b>\n"
+                f"🔥 Streak: <b>{streak}</b> {'day' if streak == 1 else 'days'}"
+                + (f" (+{min(streak, S.STREAK_MAX_DAYS) * S.STREAK_STEP_PCT} % reward)" if streak else "") + "\n"
+                f"💎 Earned today: <b>{num(info['earned_today'])}</b> / {num(S.DAILY_REWARD_CAP)}")
+    if solo is not None:
+        out += (f"\n\n🎯 <b>Solo</b> (private chat)\n🏅 Best game: <b>{num(solo['best'])}</b> pts · 🎮 Games: <b>{solo['games']}</b>\n"
+                f"⭐ Points: <b>{num(solo['points'])}</b> · 📝 Words: <b>{num(solo['words'])}</b>")
+    await m.reply(out)
 
 
 # ============================================================================== answers typed as normal messages
@@ -717,9 +766,10 @@ class JumbleMiddleware(BaseMiddleware):
         try:
             if isinstance(event, Message) and event.text and event.from_user and not event.from_user.is_bot:
                 g = svc.GAMES.get(event.chat.id)
-                if (g is not None and g.phase == "play" and g.open
-                        and D.is_guess(event.text, D.DIFFS.get(g.rdiff, D.diff(g.diff)).lengths) and await _guess(event, g)):
-                    return None
+                if g is not None and g.phase == "play" and g.open and D.is_guess(event.text, D.DIFFS.get(g.rdiff, D.diff(g.diff)).lengths):
+                    if await _guess(event, g):
+                        return None
+                    await _near_miss(event, g)
         except Exception:
             log.exception("jumble answer failed")
         return await handler(event, data)

@@ -138,20 +138,39 @@ def pick_word(lengths, theme: str = "all", used=(), rng: random.Random | None = 
     raise ValueError(f"no words of length {tuple(lengths)} in the dictionary")
 
 
+def _fixed(word: str, out: str) -> int:
+    """How many letters of the shuffle are still in their original position."""
+    return sum(a == b for a, b in zip(word, out))
+
+
 def scramble(word: str, rng: random.Random | None = None) -> str:
-    """A shuffle of the word that is NOT the word itself and (when possible) not another real word."""
+    """A shuffle of the word that is NOT the word itself, (when possible) not another real word, and (when possible) really mixed up:
+    at most len//4 letters (at least 1) may stay where they were, so the word never "half shows" in the puzzle."""
     rng = rng or random.SystemRandom()
     real = anagrams(word)
+    max_fixed = max(1, len(word) // 4)
     letters, fallback = list(word), ""
-    for _ in range(60):
+    for _ in range(200):
         rng.shuffle(letters)
         out = "".join(letters)
         if out == word:
             continue
-        if out not in real:
-            return out
-        fallback = fallback or out
+        if out in real or _fixed(word, out) > max_fixed:
+            fallback = fallback or out                       # usable, but only when nothing better turns up
+            continue
+        return out
     return fallback or word
+
+
+@lru_cache(maxsize=None)
+def _words(length: int) -> frozenset:
+    return frozenset(w for ws in _index(length).values() for w in ws)
+
+
+def is_word(text: str) -> bool:
+    """Is this a real dictionary word (of any length the game knows)? Used to cheer on a close-but-wrong answer."""
+    t = text.strip().lower()
+    return t.isascii() and t.isalpha() and t in _words(len(t))
 
 
 def new_puzzle(diff_key: str, theme: str = "all", used=(), rng: random.Random | None = None) -> tuple[str, str, frozenset]:

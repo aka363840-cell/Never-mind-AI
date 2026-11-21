@@ -62,6 +62,7 @@ class HackGame:
     created: float = field(default_factory=time.time)
     token: int = 0                                     # bumped on every new turn / phase: stale timers see a different token and stop
     history: list[tuple[str, str, int, int]] = field(default_factory=list)    # (name, guess, hacks, glitches)
+    solo: bool = False                                 # free practice against the bot (private chat): no bet, no pot
     lobby_msg: int | None = None
     board_msg: int | None = None
     task: asyncio.Task | None = None
@@ -135,7 +136,9 @@ async def busy(chat_id: int) -> str | None:
 
 # ============================================================== Hack: diamonds
 async def charge(g: HackGame, uid: int) -> None:
-    """Take the bet (raises InsufficientFunds - a GameError - if the player can't pay)."""
+    """Take the bet (raises InsufficientFunds - a GameError - if the player can't pay). Practice games (bet 0) move no diamonds."""
+    if g.bet <= 0:
+        return
     async with db.tx() as s:
         await economy.apply(s, uid, wallet=-g.bet, kind="hack_bet", ref=f"hack:{g.gid}:b:{uid}", meta={"chat": g.chat_id})
 
@@ -143,6 +146,8 @@ async def charge(g: HackGame, uid: int) -> None:
 async def refund_all(g: HackGame) -> int:
     """Give every bet back. Idempotent; a failure is logged and left to recover_orphans()."""
     n = 0
+    if g.bet <= 0:
+        return 0
     for p in g.players:
         try:
             async with db.tx() as s:
@@ -160,6 +165,22 @@ async def pay_winner(g: HackGame, uid: int) -> int:
     async with db.tx() as s:
         await economy.apply(s, uid, wallet=prize, kind="hack_win", ref=f"hack:{g.gid}:win", meta={"chat": g.chat_id, "pot": pot})
     return prize
+
+
+async def pay_winners(g: HackGame, uids: list[int]) -> list[int]:
+    """Pay the pot (minus H.FEE_PCT) to the winner(s) in ONE transaction; ties split it (the remainder goes to the first).
+    One winner keeps the old ref hack:<gid>:win; several use hack:<gid>:win:<uid> (recover_orphans only reads the game id)."""
+    if len(uids) == 1:
+        return [await pay_winner(g, uids[0])]
+    pot = g.pot
+    prize = pot - pot * H.FEE_PCT // 100
+    each = prize // len(uids)
+    shares = [each] * len(uids)
+    shares[0] += prize - each * len(uids)
+    async with db.tx() as s:
+        for uid, amount in zip(uids, shares):
+            await economy.apply(s, uid, wallet=amount, kind="hack_win", ref=f"hack:{g.gid}:win:{uid}", meta={"chat": g.chat_id, "pot": pot})
+    return shares
 
 
 async def recover_orphans() -> int:

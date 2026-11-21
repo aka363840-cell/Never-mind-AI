@@ -110,3 +110,16 @@ def split_pot(pot: int, winners: int, fee_pct: int = 0) -> list[int]:
     shares = [each] * winners
     shares[0] += prize - each * winners
     return shares
+
+
+# ----------------------------------------------------------------------------- solo (private chat) personal bests
+# Private games pay nothing and are not part of the group leaderboards; their own counters live in `user_stats`.
+SOLO_GAMES, SOLO_WORDS, SOLO_POINTS, SOLO_BEST = "jumble_solo_games", "jumble_solo_words", "jumble_solo_pts", "jumble_solo_best"
+
+
+def solo_summary(stats: dict[str, int]) -> dict | None:
+    """Solo section of /jstats from the user's counters, or None when they never finished a solo game."""
+    games = stats.get(SOLO_GAMES, 0)
+    if games <= 0:
+        return None
+    return {"games": games, "words": stats.get(SOLO_WORDS, 0), "points": stats.get(SOLO_POINTS, 0), "best": stats.get(SOLO_BEST, 0)}
