@@ -51,7 +51,7 @@ async def _is_admin(bot: Bot, m: Message) -> bool:
 def _busy_text(what: str) -> str:
     return {"wordly": "🔠 A Wordly game is running here - finish it or /end it first.",
             "hack": "🔐 A Hack game is running here - finish it or /end it first.",
-            "WordSeek": "🔎 A WordSeek game is running here - finish it or /end it first."}.get(what, "🎮 A game is already running here.")
+            "WordSeek": "🔎 A WordSeek game is running here - finish it or /end it first."}.get(what, f"🎮 A {what} game is already running here - finish it or /end it first.")
 
 
 async def _react(m: Message, emoji: str) -> bool:

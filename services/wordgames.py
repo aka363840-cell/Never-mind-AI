@@ -110,6 +110,12 @@ def running(chat_id: int) -> str | None:
     from services import jumble as _jumble                   # Jumble add-on
     if chat_id in _jumble.GAMES:
         return "jumble"
+    from services import speedgames as _speed, wordchain as _wc
+    if chat_id in _wc.GAMES:
+        return "Word Chain"
+    g = _speed.GAMES.get(chat_id)
+    if g is not None:
+        return "Fastest Tap" if g.kind == "tap" else "Crash Count"
     return None
 
 
@@ -118,9 +124,6 @@ async def busy(chat_id: int) -> str | None:
     r = running(chat_id)
     if r:
         return r
-    from services import wordchain as wc
-    if chat_id in wc.GAMES:
-        return "Word Chain"
     from services import wordseek as ws
     cur = await ws.get(chat_id)
     if cur is not None and ws.idle_for(cur) < ws.IDLE_REPLACE_S:

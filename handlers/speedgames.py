@@ -99,6 +99,9 @@ async def _open(m: Message, command: CommandObject, bot: Bot, user: User, kind: 
         raise GameError(_usage(kind))
     if (bad := G.stake_problem(amount)):
         raise GameError(bad)
+    from services import wordgames as wg                          # one game at a time per chat (all games)
+    if (other := await wg.busy(m.chat.id)) and svc.get(m.chat.id) is None:
+        raise GameError(f"🎮 A {other} game is running here - finish it or /end it first.")
     g = svc.new(kind, m.chat.id, user.id, user.first_name, amount)      # reserve the chat first: two /tap at once -> one lobby
     try:
         await svc.check_funds(user.id, amount, esc(user.first_name))
