@@ -107,6 +107,11 @@ async def auto_scan(bot, chat_id: int, force: bool = False, since: float | None 
                 return
         from handlers.waifu import _admins, _still_here
         await full_scan(chat_id, lambda uid, strict=False: _still_here(bot, chat_id, uid, strict), lambda: _admins(bot, chat_id), since=since)
+        try:                                                  # real member list through MTProto (only when TELEGRAM_API_ID / _HASH are set)
+            from services import mtproto
+            await mtproto.sync_group(chat_id)
+        except Exception:
+            log.exception("mtproto sync failed for %s", chat_id)
     except Exception:
         log.exception("auto scan failed for %s", chat_id)
 

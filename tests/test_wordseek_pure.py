@@ -43,3 +43,11 @@ def test_pick_avoids_recent():
         avoid = set(W.ANSWERS[n][:-1])
         assert W.pick_word(n, avoid, random.Random(1)) == W.ANSWERS[n][-1]
         assert len(W.pick_word(n)) == n
+
+
+def test_mtproto_clean_filters_bots_and_duplicates():
+    from types import SimpleNamespace as N
+    from services.mtproto import clean
+    rows = [N(id=1, username="a", first_name="A", bot=False), N(id=1, username="a", first_name="A", bot=False),
+            N(id=2, username=None, first_name=None, bot=False), N(id=3, username="b", first_name="B", bot=True), N(id=4, deleted=True)]
+    assert clean(rows) == [(1, "a", "A"), (2, None, "Player")]
