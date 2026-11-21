@@ -33,16 +33,14 @@ def _in_group(m: Message) -> bool:
 async def growdick_cmd(m: Message, db_user: User):
     g = await dick.grow(db_user.id, m.chat.id if _in_group(m) else None)
     who = link(db_user.id, db_user.first_name, db_user.username)
-    if g.first:
-        head = f"🍆 {who}, welcome! Your dick is now <b>{g.new} cm</b> (+{g.delta})."
-    elif g.delta > 0:
-        head = f"📈 {who}, your dick <b>grew +{g.delta} cm</b>!\nNow: <b>{g.new} cm</b>"
+    if g.delta > 0:
+        change = f"has grown by <b>{g.delta} cm</b> and now it is <b>{g.new} cm</b> long !!"
     elif g.delta < 0:
-        head = f"📉 {who}, your dick <b>shrank {g.delta} cm</b> 😭\nNow: <b>{g.new} cm</b>"
+        change = f"has shrunk by <b>{-g.delta} cm</b> and now it is <b>{g.new} cm</b> long !!"
     else:
-        head = f"😐 {who}, nothing changed today. Still <b>{g.new} cm</b>."
-    rank = f"\n🏆 Rank: <b>#{g.rank_group}</b> in this group · <b>#{g.rank_all}</b> overall" if g.rank_group else f"\n🏆 Overall rank: <b>#{g.rank_all}</b>"
-    await m.reply(f"{head}{rank}\n<i>Next try in 24h. Fight for cm: /pvp &lt;cm&gt; · board: /dicktop</i>")
+        change = f"has not changed, it is still <b>{g.new} cm</b> long !!"
+    await m.reply(f"🍆{who} Your dick {change}\n🏆Your position in the top is <b>{g.rank_all}</b> overall.\n\n"
+                  f"Next attempt in <b>{dick.hm(dick.COOLDOWN_S)}</b>.\n\n– /pvp\n– /dicktop")
 
 
 # ------------------------------------------------------------------------------------------------ /pvp
