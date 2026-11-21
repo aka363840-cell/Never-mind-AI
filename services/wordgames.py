@@ -110,9 +110,11 @@ def running(chat_id: int) -> str | None:
     from services import jumble as _jumble                   # Jumble add-on
     if chat_id in _jumble.GAMES:
         return "jumble"
-    from services import speedgames as _speed, wordchain as _wc
+    from services import charades as _ch, speedgames as _speed, wordchain as _wc
     if chat_id in _wc.GAMES:
         return "Word Chain"
+    if chat_id in _ch.GAMES:
+        return "Charades"
     g = _speed.GAMES.get(chat_id)
     if g is not None:
         return "Fastest Tap" if g.kind == "tap" else "Crash Count"

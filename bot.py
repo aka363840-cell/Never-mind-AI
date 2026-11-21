@@ -68,12 +68,13 @@ async def housekeeping_loop() -> None:
 
 
 def build_dispatcher(ai=None) -> Dispatcher:
-    from handlers import admin, ai_chat, casino, clan, combat, economy, events as events_h, fun, pets as pets_h, rank, shop as shop_h, start, welcome, extras as extras_h, life as life_h, realm as realm_h, family as family_h, arcade as arcade_h, romance as romance_h, waifu as waifu_h, afk as afk_h, consent as consent_h, whisper as whisper_h, tagall as tagall_h, members as members_h, quote as quote_h, wordseek as wordseek_h, wordgames as wordgames_h, wordchain as wordchain_h, jumble as jumble_h, academy_routers
+    from handlers import admin, ai_chat, casino, clan, combat, economy, events as events_h, fun, pets as pets_h, rank, shop as shop_h, start, welcome, extras as extras_h, life as life_h, realm as realm_h, family as family_h, arcade as arcade_h, romance as romance_h, waifu as waifu_h, afk as afk_h, consent as consent_h, whisper as whisper_h, tagall as tagall_h, members as members_h, quote as quote_h, wordseek as wordseek_h, wordgames as wordgames_h, wordchain as wordchain_h, charades as charades_h, jumble as jumble_h, academy_routers
     dp = Dispatcher()
     dp.workflow_data["ai"] = ai
     from services.academy_seen import GroupSeenMiddleware      # Academy Part 6: notes group activity (one write per group per 6 h)
     dp.update.outer_middleware(GroupSeenMiddleware())
     dp.message.outer_middleware(tagall_h.AtAllMiddleware())     # '@all text' typed as a normal message
+    dp.message.outer_middleware(charades_h.CharadesMiddleware())      # Charades guesses typed as normal messages
     dp.message.outer_middleware(wordchain_h.WordChainMiddleware())    # the current Word Chain player's one-word message = their move
     dp.message.outer_middleware(wordgames_h.WordGamesMiddleware())    # Wordly words / Hack codes typed as normal messages
     dp.message.outer_middleware(jumble_h.JumbleMiddleware())          # Jumble answers typed as normal messages
@@ -100,7 +101,7 @@ def build_dispatcher(ai=None) -> Dispatcher:
     except Exception:
         log.exception("moderation module failed to load - continuing without it")
     # order matters: admin & game routers first, free-form AI chat last
-    routers = [admin.router, start.router, economy.router, casino.router, clan.router, pets_h.router, events_h.router, realm_h.router, consent_h.router, fun.router, combat.router, shop_h.router, rank.router, welcome.router, extras_h.router, life_h.router, family_h.router, arcade_h.router, romance_h.router, waifu_h.router, afk_h.router, whisper_h.router, tagall_h.router, members_h.router, quote_h.router, jumble_h.router, wordgames_h.router, wordchain_h.router, wordseek_h.router, *academy_routers.routers(), ai_chat.router]
+    routers = [admin.router, start.router, economy.router, casino.router, clan.router, pets_h.router, events_h.router, realm_h.router, consent_h.router, fun.router, combat.router, shop_h.router, rank.router, welcome.router, extras_h.router, life_h.router, family_h.router, arcade_h.router, romance_h.router, waifu_h.router, afk_h.router, whisper_h.router, tagall_h.router, members_h.router, quote_h.router, jumble_h.router, wordgames_h.router, wordchain_h.router, charades_h.router, wordseek_h.router, *academy_routers.routers(), ai_chat.router]
     if mod_head is not None:
         routers.insert(0, mod_head)                  # group moderation commands win over same-named game commands (groups only)
         routers.insert(routers.index(ai_chat.router), mod_tail)     # AI-isolation guard sits right before the AI chat
