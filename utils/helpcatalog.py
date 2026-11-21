@@ -27,9 +27,10 @@ MENU = (
     "start", "help", "rules", "profile", "bal", "daily", "weekly", "work", "crime", "rob", "pay", "deposit", "withdraw",
     "kill", "revenge", "revive", "duel", "protect", "bounty", "shop", "inventory", "hunt", "dungeon", "pet",
     "clan", "top", "missions", "arcade", "spin", "slots", "tap", "crash", "marry", "family", "houses", "collect", "cd",
+    "fish", "academy", "achievements",
 )
 # AI chat only works in groups, so /ask (and /settings) are listed in the group menu only
-GROUP_MENU_EXTRA = ("ask", "settings")
+GROUP_MENU_EXTRA = ("ask", "afk", "waifu", "whisper", "tagall", "q", "settings")
 
 # name -> description ("{name}" / "{emoji}" are replaced with the bot's name / emoji)
 DESC_LIST: list[tuple[str, str]] = [
