@@ -43,6 +43,28 @@ def _gid() -> str:
     return secrets.token_urlsafe(5)
 
 
+# =============================================================== group word & party games (info cards from the hub)
+GAME_INFO = {
+    "ws": "🔎 <b>WordSeek</b> (groups &amp; DM)\nA hidden word, everybody guesses by typing. 🟩 right place · 🟨 wrong place · 🟥 not in the word.\n"
+          "/new (5 letters) · /new4 · /new5 · /new6 · /end · /wlb leaderboard · /myscore · /wordhelp",
+    "wl": "🔠 <b>Wordly</b> (word scramble)\nUse the 8 given letters to make as many words as you can in 2 minutes - first to type a word gets it.\n/wordly or /wl · /end",
+    "hk": "🔐 <b>Hack</b> (password cracking, bets 💎)\nCrack the secret code: 🔓 hacks = right digit, right place · ⚡ glitches = right digit, wrong place. Turn-based, winner takes the pot.\n"
+          "/hack3 · /hack4 · /hack5 · /hack6 <i>amount</i> · /joinhack · /end (host)",
+    "wc": "⛓ <b>Word Chain</b> (groups, elimination)\nSay a word starting with the last letter of the previous word. Words get longer and the clock shorter - last one standing wins.\n"
+          "/wc or /wordchain · /join · /forcestart · /end",
+    "jm": "🐙 <b>Word Jumble</b> (rounds or race, rewards 💎)\nUnscramble the word first. Pick difficulty, speed, theme and an optional entry fee.\n"
+          "/jumble or /jum · /jskip · /jlb leaderboard · /jstats · /end",
+    "ch": "🎭 <b>Charades</b> (groups)\nThe host gets a secret word in DM and describes it with emojis, clues or text - everybody else guesses by typing. After each round a button lets anyone become the next host.\n"
+          "/charades or /describe · /end",
+}
+
+
+def _game_info(key: str):
+    async def show(msg: Message, user: User, reply: bool = True) -> None:
+        await (msg.reply if reply else msg.answer)(GAME_INFO[key] + "\n\n<i>Only one game can run in a chat at a time.</i>")
+    return show
+
+
 # =============================================================== hub
 async def hub(uid: int) -> tuple[str, InlineKeyboardMarkup]:
     st = await arcade.stats_of(uid)
@@ -55,6 +77,8 @@ async def hub(uid: int) -> tuple[str, InlineKeyboardMarkup]:
             "🔤 /hangman — guess the word, win 💎\n"
             "⚡ /tap <i>amount</i> — fastest finger wins everybody's entry (group, min. 2 players)\n"
             "💥 /crash <i>amount</i> — first to count the letters of the secret word wins (group, min. 2 players)\n"
+            "🔎 /new — WordSeek word guessing (/new4 /new5 /new6) · 🔠 /wordly · 🔐 /hack4 <i>amount</i>\n"
+            "⛓ /wc — Word Chain · 🐙 /jumble — unscramble words · 🎭 /charades — describe it!\n"
             "🤔 /wyr — would you rather? the group votes live\n"
             "🧩 /riddle · 💡 /fact · 🔮 /horoscope · 🥠 /fortune\n"
             "🌟 /rep <i>(reply)</i> · /toprep — give respect, climb the board\n"
@@ -62,6 +86,9 @@ async def hub(uid: int) -> tuple[str, InlineKeyboardMarkup]:
     rows = [[B(text="🎟 Scratch card", callback_data="ar:sc"), B(text="🔤 Hangman", callback_data="ar:hm")],
             [B(text="⭕ Tic-Tac-Toe", callback_data="ar:ttt"), B(text="🤔 Would you rather", callback_data="ar:wy")],
             [B(text="⚡ Fastest Tap", callback_data="ar:tap"), B(text="💥 Crash Count", callback_data="ar:cr")],
+            [B(text="🔎 WordSeek", callback_data="ar:ws"), B(text="🔠 Wordly", callback_data="ar:wl")],
+            [B(text="🔐 Hack", callback_data="ar:hk"), B(text="⛓ Word Chain", callback_data="ar:wc")],
+            [B(text="🐙 Jumble", callback_data="ar:jm"), B(text="🎭 Charades", callback_data="ar:ch")],
             [B(text="🧩 Riddle", callback_data="ar:rd"), B(text="💡 Fun fact", callback_data="ar:fc")],
             [B(text="🔮 Horoscope", callback_data="ar:ho"), B(text="🥠 Fortune", callback_data="ar:fo")],
             [B(text="🏦 Bank interest", callback_data="ar:in"), B(text="🌟 Top reputation", callback_data="ar:tr")],
@@ -81,7 +108,8 @@ async def arcade_nav(cb: CallbackQuery, db_user: User):
     msg = cb.message
     table = {"sc": do_scratch, "hm": do_hangman, "ttt": do_ttt, "wy": do_wyr, "rd": do_riddle, "fc": do_fact,
              "ho": do_horoscope, "fo": do_fortune, "in": do_interest, "tr": do_toprep,
-             "tap": speed_h.do_tap_info, "cr": speed_h.do_crash_info}
+             "tap": speed_h.do_tap_info, "cr": speed_h.do_crash_info,
+             **{k: _game_info(k) for k in GAME_INFO}}
     fn = table.get(what)
     if fn is None:
         raise GameError("❌ Unknown button.")
