@@ -31,6 +31,10 @@ class Database:
                 try:                                    # ~2 MB page cache per connection instead of the default; no memory-mapped IO
                     dbapi_conn.execute("PRAGMA cache_size=-2000")
                     dbapi_conn.execute("PRAGMA mmap_size=0")
+                    if ":memory:" not in url:               # speed: WAL + NORMAL = no fsync on every commit, readers never block the writer
+                        dbapi_conn.execute("PRAGMA journal_mode=WAL")
+                        dbapi_conn.execute("PRAGMA synchronous=NORMAL")
+                        dbapi_conn.execute("PRAGMA temp_store=MEMORY")
                 except Exception:
                     pass
 

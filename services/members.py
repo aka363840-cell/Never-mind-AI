@@ -103,7 +103,7 @@ async def auto_scan(bot, chat_id: int, force: bool = False, since: float | None 
         if scanning(chat_id):
             return
         if not force:
-            if await roster_size(chat_id) >= 8 or not await kv.set_nx(f"autoscan:{chat_id}", 86400):
+            if not await kv.set_nx(f"autoscan:{chat_id}", 86400) or await roster_size(chat_id) >= 8:      # kv first: no DB count on every message
                 return
         from handlers.waifu import _admins, _still_here
         await full_scan(chat_id, lambda uid, strict=False: _still_here(bot, chat_id, uid, strict), lambda: _admins(bot, chat_id), since=since)
