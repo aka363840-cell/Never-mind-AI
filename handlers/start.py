@@ -34,7 +34,6 @@ async def _render(name: str, user: User):
             log.exception("moderation help unavailable")
         if not rows:
             return ("🛡 <b>Moderation help</b>\nNot available right now — try <code>/modhelp</code> directly.", kb([back("main")]))
-        rows.insert(0, [B(text="👋 Welcome & Leave on/off", callback_data="wl:page")])
         return ("🛡 <b>Moderation help</b>\nEvery admin command, explained simply.\n👋 Welcome / leave on-off: <code>/welcomemsg on|off</code> · <code>/leavemsg on|off</code>\nPick a category:", kb(rows))
     if name == "main":
         return await views.main(user.first_name)
