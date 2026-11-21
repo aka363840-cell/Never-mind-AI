@@ -265,8 +265,15 @@ _LEGEND = ("🔤 <b>How to read this:</b> &lt;required&gt; · [optional] · <i>t
            "or <code>@username</code> / numeric ID · <i>duration</i> = <code>30s 15m 2h 3d 1w</code>\n")
 
 
+# info-only entries for commands the host bot handles (handlers/welcome.py): shown FIRST on the "Group settings" page - used all the time
+_HOST_ENTRIES = [
+    {"names": ["welcomemsg"], "cat": "settings", "usage": "/welcomemsg on|off", "desc": "Turn the welcome message for new members ON or OFF in this group (off = nothing is sent, default or custom)"},
+    {"names": ["leavemsg"], "cat": "settings", "usage": "/leavemsg on|off", "desc": "Turn the leaving (goodbye) message ON or OFF in this group"},
+]
+
+
 def _help_page(cat: str) -> str:
-    items = [h for h in HELP if h["cat"] == cat]
+    items = ([h for h in _HOST_ENTRIES if h["cat"] == cat]) + [h for h in HELP if h["cat"] == cat]
     lines = [f"<b>{CATS[cat]}</b>", _LEGEND]
     for h in items:
         al = " ".join(f"/{n}" for n in h["names"][1:])
@@ -299,7 +306,7 @@ async def help_cb(cb: CallbackQuery):
     if cb.message is None:
         return await cb.answer()
     if key == "menu":
-        text, kb = "🛡 <b>Moderation help</b>\nPick a category:", _help_kb()
+        text, kb = "🛡 <b>Moderation help</b>\n👋 Welcome / leave on-off: <code>/welcomemsg on|off</code> · <code>/leavemsg on|off</code>\nPick a category:", _help_kb()
     elif key == "notes" or key in CATS:
         text = NOTES if key == "notes" else _help_page(key)
         kb = InlineKeyboardMarkup(inline_keyboard=[[B(text="⬅️ Back", callback_data="mod:h:menu")]])
