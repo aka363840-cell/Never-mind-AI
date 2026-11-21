@@ -51,7 +51,8 @@ GAME_INFO = {
     "hk": "🔐 <b>Hack</b> (password cracking, bets 💎)\nCrack the secret code: 🔓 hacks = right digit, right place · ⚡ glitches = right digit, wrong place. Turn-based, winner takes the pot.\n"
           "/hack3 · /hack4 · /hack5 · /hack6 <i>amount</i> · /joinhack · /end (host)",
     "wc": "⛓ <b>Word Chain</b> (groups, elimination)\nSay a word starting with the last letter of the previous word. Words get longer and the clock shorter - last one standing wins.\n"
-          "/wc or /wordchain · /join · /forcestart · /end",
+          "Modes: /wc classic · /starthard · /startcfl · /startbl · /startrl · /startelim (see /wcmodes)\n"
+          "/join · /flee · /forcestart · /forcejoin · /extend · /forceskip · /wcstatus · /wchelp · /wcstats · /wclb · /end",
     "jm": "🐙 <b>Word Jumble</b> (rounds or race, rewards 💎)\nUnscramble the word first. Pick difficulty, speed, theme and an optional entry fee.\n"
           "/jumble or /jum · /jskip · /jlb leaderboard · /jstats · /end",
     "ch": "🎭 <b>Charades</b> (groups)\nThe host gets a secret word in DM and describes it with emojis, clues or text - everybody else guesses by typing. After each round a button lets anyone become the next host.\n"
@@ -73,7 +74,7 @@ async def hub(uid: int) -> tuple[str, InlineKeyboardMarkup]:
             "🔎 /new /new4 /new5 /new6 · /wlb · /myscore · /wordhelp — WordSeek word guessing\n"
             "🔠 /wordly (/wl) — make words from 8 letters\n"
             "🔐 /hack3 /hack4 /hack5 /hack6 <i>amount</i> · /joinhack — crack the code, win the pot\n"
-            "⛓ /wc · /join · /forcestart — Word Chain\n"
+            "⛓ /wc (+ /starthard /startelim …) · /join · /flee · /wcmodes · /wcstats · /wclb — Word Chain\n"
             "🐙 /jumble (/jum) · /jskip · /jlb · /jstats — unscramble words\n"
             "🎭 /charades (/describe) — describe it, the host rotates\n"
             "⚡ /tap <i>amount</i> — best-of-3 reflex battle (<code>/tap free</code> to practice) · /taptop\n"
