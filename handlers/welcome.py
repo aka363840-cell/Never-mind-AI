@@ -5,12 +5,12 @@ import logging
 
 from aiogram import Bot, F, Router
 from aiogram.filters import ChatMemberUpdatedFilter, Command, CommandObject, JOIN_TRANSITION, LEAVE_TRANSITION
-from aiogram.types import ChatJoinRequest, ChatMemberUpdated, InlineKeyboardButton as B, Message
+from aiogram.types import CallbackQuery, ChatJoinRequest, ChatMemberUpdated, InlineKeyboardButton as B, InlineKeyboardMarkup, Message
 
 from database.models import AppState
 from database.session import db
 from services.kv import kv
-from keyboards.menus import kb
+from keyboards.menus import back, kb
 from utils import brand, content, deck
 from utils.fmt import esc, mention
 from utils.telegram import safe_send
@@ -92,6 +92,37 @@ async def _toggle(m: Message, bot: Bot, command: CommandObject, kind: str, label
     async with db.tx() as s:
         await users.set_state(s, _flag_key(m.chat.id, kind), "1" if arg == "off" else "0")
     await m.reply(f"{'🔔' if arg == 'on' else '🔕'} {label} messages are now <b>{arg.upper()}</b>.")
+
+
+async def _greet_page(chat_id: int | None) -> tuple[str, InlineKeyboardMarkup]:
+    if chat_id is None:
+        return ("👋 <b>Welcome &amp; Leave messages</b>\n\nOpen this page in a group: group admins can switch the welcome message and the leaving "
+                "message ON or OFF with the buttons (or <code>/welcomemsg on|off</code> · <code>/leavemsg on|off</code>)."), kb([back("main")])
+    w_off, l_off = await _switched_off(chat_id, "join"), await _switched_off(chat_id, "leave")
+    text = ("👋 <b>Welcome &amp; Leave messages</b>\n\n"
+            f"Welcome message: <b>{'OFF 🔕' if w_off else 'ON 🔔'}</b>\nLeaving message: <b>{'OFF 🔕' if l_off else 'ON 🔔'}</b>\n\n"
+            "Group admins: tap a button to switch it.\n<code>/welcomemsg on|off</code> · <code>/leavemsg on|off</code>")
+    return text, kb([[B(text=f"👋 Welcome: {'OFF 🔕' if w_off else 'ON 🔔'}", callback_data="wl:t:join"),
+                      B(text=f"🚪 Leave: {'OFF 🔕' if l_off else 'ON 🔔'}", callback_data="wl:t:leave")], back("main")])
+
+
+@router.callback_query(F.data.regexp(r"^wl:(page|t:(join|leave))$"))
+async def greet_cb(cb: CallbackQuery, bot: Bot):
+    from utils.telegram import safe_answer, safe_edit
+    msg = cb.message
+    chat_id = msg.chat.id if msg is not None and msg.chat.type in ("group", "supergroup") else None
+    part = cb.data.split(":")
+    if part[1] == "t":
+        if chat_id is None:
+            return await safe_answer(cb, "Use this in a group.", True)
+        if not await _is_admin(bot, chat_id, cb.from_user.id):
+            return await safe_answer(cb, "Only group admins can change this.", True)
+        from services import users
+        async with db.tx() as s:
+            await users.set_state(s, _flag_key(chat_id, part[2]), "0" if await _switched_off(chat_id, part[2]) else "1")
+    text, markup = await _greet_page(chat_id)
+    await safe_edit(cb, text, markup)
+    await safe_answer(cb)
 
 
 @router.message(Command("welcomemsg", ignore_case=True))
