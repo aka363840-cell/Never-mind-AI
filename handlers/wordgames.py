@@ -2,7 +2,7 @@
 
 🔠 Word scramble (wordly)   /wordly or /wl - start · type words made from the 8 letters (2 minutes)
 🔐 Password hacking         /hack3 /hack4 /hack5 /hack6 <amount> - open a lobby (the host's bet) · /joinhack - join (same bet)
-/end                        ends the running game (Wordly: starter or group admin · Hack: host only · otherwise WordSeek's /end)
+/endgame                        ends the running game (Wordly: starter or group admin · Hack: host only · otherwise WordSeek's /endgame)
 """
 from __future__ import annotations
 
@@ -49,9 +49,9 @@ async def _is_admin(bot: Bot, m: Message) -> bool:
 
 
 def _busy_text(what: str) -> str:
-    return {"wordly": "🔠 A Wordly game is running here - finish it or /end it first.",
-            "hack": "🔐 A Hack game is running here - finish it or /end it first.",
-            "WordSeek": "🔎 A WordSeek game is running here - finish it or /end it first."}.get(what, f"🎮 A {what} game is already running here - finish it or /end it first.")
+    return {"wordly": "🔠 A Wordly game is running here - finish it or /endgame it first.",
+            "hack": "🔐 A Hack game is running here - finish it or /endgame it first.",
+            "WordSeek": "🔎 A WordSeek game is running here - finish it or /endgame it first."}.get(what, f"🎮 A {what} game is already running here - finish it or /endgame it first.")
 
 
 async def _react(m: Message, emoji: str) -> bool:
@@ -86,7 +86,7 @@ def _wordly_intro(g: svc.WordlyGame) -> str:
             "• points: " + " · ".join(f"{n} letters = <b>{p}</b>" for n, p in WL.SCORE.items()) + "\n"
             "• every word counts once - the first one to type it gets it\n"
             "• 👍 = accepted · 🔥 = 6+ letters\n\n"
-            f"⏱ <b>{WL.ROUND_S // 60} minutes</b> · /end to stop early")
+            f"⏱ <b>{WL.ROUND_S // 60} minutes</b> · /endgame to stop early")
 
 
 def _wordly_result(g: svc.WordlyGame, title: str) -> str:
@@ -218,7 +218,7 @@ def _lobby_kb(g: svc.HackGame) -> InlineKeyboardMarkup:
 def _intro(g: svc.HackGame) -> str:
     ex = "0123456789"[: g.n]
     head = (f"🚀 <b>HACK {g.n} - practice</b> (free, no bet)" if g.solo else f"🚀 <b>HACK {g.n} started!</b> Pot: <b>{num(g.pot)}</b> 💎")
-    tail = ("Beat the code in as few tries as you can. /end to stop." if g.solo else
+    tail = ("Beat the code in as few tries as you can. /endgame to stop." if g.solo else
             "Everybody sees every guess. <b>First to crack it takes the pot!</b> 🏆")
     return (f"{head}\n\n"
             f"I locked a secret code of <b>{g.n} different digits</b> (a 0 can be first, no digit repeats).\n"
@@ -613,7 +613,7 @@ async def hackdaily_cmd(m: Message, command: CommandObject, db_user: User):
         await m.reply("⏸ Daily Hack paused - your tries are saved. Send /hackdaily to continue.")
         return
     if svc.HACK.get(m.chat.id) is not None:
-        raise GameError("🔐 You have a practice game running - finish it or /end it first.")
+        raise GameError("🔐 You have a practice game running - finish it or /endgame it first.")
     tries = await hs.solved_today(uid, day)
     if tries:
         raise GameError(f"✅ You already cracked today's code in <b>{tries}</b> {'try' if tries == 1 else 'tries'}. New code in {_left(hs.seconds_to_reset())} · /hlb daily")
@@ -675,15 +675,15 @@ async def hlb_cmd(m: Message, command: CommandObject):
     await m.reply("🏆 <b>Hack leaderboard</b> · all time\n\n" + "\n".join(lines) + "\n\n<i>/hlb daily - today's daily code · /hstats - your rank</i>")
 
 
-# ============================================================================== /end
+# ============================================================================== /endgame
 class _HasGame(Filter):
-    """True while Wordly or Hack runs in the chat - otherwise /end falls through to WordSeek's own /end."""
+    """True while Wordly or Hack runs in the chat - otherwise /endgame falls through to WordSeek's own /endgame."""
 
     async def __call__(self, message: Message) -> bool:
         return svc.running(message.chat.id) is not None
 
 
-@router.message(Command("end"), _HasGame())
+@router.message(Command("endgame", "endwordly", "endhack"), _HasGame())
 async def end_cmd(m: Message, bot: Bot):
     if m.from_user is None:
         return

@@ -173,7 +173,7 @@ def test_jumble_is_in_help_but_not_in_the_slash_menu():
     desc = dict(C.DESC_LIST)
     for c in ("jumble", "jlb", "jstats", "jskip"):
         assert c in desc, c
-    assert "/jum" in desc["jumble"] and "Jumble" in desc["end"]
+    assert "/jum" in desc["jumble"] and "Jumble" in desc["endgame"]
     assert "jum" in C.ALIASES["jumble"]
     games = dict(C.CATEGORIES)["🕹 Games"]
     assert all(c in games for c in ("jumble", "jlb", "jstats", "jskip"))

@@ -5,8 +5,8 @@ Deliberately NOT in the Telegram "/" menu (they are listed in /help, Games).
 /jskip            vote to skip the current word
 /jlb              leaderboard: /jlb [global|group] [today|week|month|all] · /jlb solo = best solo (private chat) games
 /jstats           your Jumble stats and daily streak (reply to someone to see theirs)
-/end              end the running Jumble (the player who started it, or a group admin); when no Jumble runs,
-                  /end falls through to Wordly / Hack / WordSeek exactly as before
+/endgame              end the running Jumble (the player who started it, or a group admin); when no Jumble runs,
+                  /endgame falls through to Wordly / Hack / WordSeek exactly as before
 While a round is open, a plain message that unscrambles the word is the answer (needs normal group messages, same as WordSeek).
 """
 from __future__ import annotations
@@ -54,10 +54,10 @@ async def _is_admin(bot: Bot, m: Message) -> bool:
 
 
 def _busy_text(what: str) -> str:
-    return {"jumble": "🐙 A Jumble game is already running here - finish it or /end it first.",
-            "wordly": "🔠 A Wordly game is running here - finish it or /end it first.",
-            "hack": "🔐 A Hack game is running here - finish it or /end it first.",
-            "WordSeek": "🔎 A WordSeek game is running here - finish it or /end it first."}.get(what, f"🎮 A {what} game is already running here - finish it or /end it first.")
+    return {"jumble": "🐙 A Jumble game is already running here - finish it or /endgame it first.",
+            "wordly": "🔠 A Wordly game is running here - finish it or /endgame it first.",
+            "hack": "🔐 A Hack game is running here - finish it or /endgame it first.",
+            "WordSeek": "🔎 A WordSeek game is running here - finish it or /endgame it first."}.get(what, f"🎮 A {what} game is already running here - finish it or /endgame it first.")
 
 
 async def _react(m: Message, emoji: str) -> bool:
@@ -156,7 +156,7 @@ def _lobby_text(g: svc.JumbleGame) -> str:
             f"🎮 {_mode_line(g)} · {_theme_line(g)}\n🎚 {_diff_line(g)}\n\n"
             f"👥 <b>Players</b> ({len(g.players)}/{D.MAX_POT_PLAYERS})\n{names}\n\n"
             f"Join with the button (same entry fee). The best player takes the pot. Starts in {D.LOBBY_S}s with 2+ players, "
-            "or when the host taps Start. /end cancels and refunds everybody.")
+            "or when the host taps Start. /endgame cancels and refunds everybody.")
 
 
 def _lobby_kb(g: svc.JumbleGame) -> InlineKeyboardMarkup:
@@ -172,7 +172,7 @@ def _intro(g: svc.JumbleGame) -> str:
             + "\nI show a scrambled word. Type the real word in the chat - the <b>first correct answer</b> wins the round!\n"
               "• points per word + a speed bonus (up to +2)\n"
               "• 💡 a letter is revealed at 50 % and 75 % of the time (−1 point each)\n"
-              "• any real anagram counts · /jskip to vote to skip · /end to stop early\n\n"
+              "• any real anagram counts · /jskip to vote to skip · /endgame to stop early\n\n"
               "Get ready… 🚀")
 
 
@@ -241,8 +241,8 @@ async def _new(bot: Bot, chat_id: int, uid: int) -> None:
     await _reap(chat_id)
     cur = svc.GAMES.get(chat_id)
     if cur is not None:
-        raise GameError("🐙 A Jumble game is already running here - finish it or /end it first." if cur.phase == "play"
-                        else "🐙 A Jumble setup is already open here - pick the settings, or /end it.")
+        raise GameError("🐙 A Jumble game is already running here - finish it or /endgame it first." if cur.phase == "play"
+                        else "🐙 A Jumble setup is already open here - pick the settings, or /endgame it.")
     what = await svc.busy(chat_id)
     if what:
         raise GameError(_busy_text(what))
@@ -653,15 +653,15 @@ async def skip_cmd(m: Message):
         await m.reply(f"⏭ Skip votes: {have}/{need}")
 
 
-# ============================================================================== /end
+# ============================================================================== /endgame
 class _HasJumble(Filter):
-    """True while a Jumble (setup, lobby or play) exists in the chat - otherwise /end falls through to the other games' /end."""
+    """True while a Jumble (setup, lobby or play) exists in the chat - otherwise /endgame falls through to the other games' /endgame."""
 
     async def __call__(self, message: Message) -> bool:
         return message.chat.id in svc.GAMES
 
 
-@router.message(Command("end"), _HasJumble())
+@router.message(Command("endgame", "endjumble"), _HasJumble())
 async def end_cmd(m: Message, bot: Bot):
     if m.from_user is None:
         return

@@ -67,7 +67,7 @@ class Game:
 class Result:
     got: int = 0                                # diamonds the winner received
     burned: int = 0
-    refunded: bool = False                      # everybody got the entry back (no winner / /end)
+    refunded: bool = False                      # everybody got the entry back (no winner / /endgame)
     capped: list[int] = field(default_factory=list)             # losers refunded because of the daily pair limit
     unlocked: list[str] = field(default_factory=list)           # achievements the winner just unlocked
 
@@ -98,7 +98,7 @@ def get(chat_id: int) -> Game | None:
 
 def new(kind: str, chat_id: int, host: int, host_name: str, amount: int) -> Game:
     if get(chat_id) is not None:
-        raise GameError("🎮 A speed game is already running in this chat. Join it, wait for it to finish, or /end it.")
+        raise GameError("🎮 A speed game is already running in this chat. Join it, wait for it to finish, or /endgame it.")
     g = Game(kind=kind, chat_id=chat_id, host=host, amount=amount)
     g.players[host] = host_name
     GAMES[chat_id] = g
@@ -179,7 +179,7 @@ async def _pair_games(s, a: int, b: int) -> int:
 
 
 async def release(g: Game, winner: int | None, played: bool = True) -> Result:
-    """Settle the escrow ONCE, atomically. winner=None (no winner, /end, error) refunds everybody.
+    """Settle the escrow ONCE, atomically. winner=None (no winner, /endgame, error) refunds everybody.
     With a winner every other player's entry goes to him minus FEE_PCT (burned); a loser who already lost PAIR_DAILY paid matches
     to this winner today gets the entry back instead. `played` = a real match was decided (counters, achievements, missions)."""
     res = Result()

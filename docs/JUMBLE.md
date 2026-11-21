@@ -9,7 +9,7 @@ Listed in `/help` (Games) but **not** in Telegram's "/" command menu.
 | `/jskip` | Vote to skip the current word (2 votes in a group, 1 in a private chat, a majority of the players in a paid game). |
 | `/jlb [global\|group] [today\|week\|month\|all]` | Leaderboard (default: this group, this week; in a private chat: global). |
 | `/jstats` | Your points, words, games, wins, day streak and diamonds earned today (reply to someone to see theirs). |
-| `/end` | End the running game (the player who started it, or a group admin). Cancels an open setup / lobby. In a paid game everybody is refunded. |
+| `/endgame` | End the running game (the player who started it, or a group admin). Cancels an open setup / lobby. In a paid game everybody is refunded. |
 
 ## The setup panel (only the player who started the game can use it)
 | Row | Choices |
@@ -34,7 +34,7 @@ Listed in `/help` (Games) but **not** in Telegram's "/" command menu.
 
 ## Paid games (optional entry fee)
 * The host picks an entry fee and presses Start → the host pays and a lobby opens (2-8 players, Join button, starts after 60 s with 2+ players or when the host taps Start). Only players who paid can score or vote.
-* The best player takes the whole pot (a tie splits it; `FEE_PCT` in `game/jumble.py` = house fee, default 0). Nobody scored, `/end`, an error, or nobody joining → everybody is refunded.
+* The best player takes the whole pot (a tie splits it; `FEE_PCT` in `game/jumble.py` = house fee, default 0). Nobody scored, `/endgame`, an error, or nobody joining → everybody is refunded.
 * Money safety: every change goes through `economy.apply` with idempotency refs (`jumblebet:<game>:b|r|w:<user>`); the payout is one transaction; `services.jumble.recover_orphans()` runs at boot and refunds entry fees of a game that a restart interrupted.
 
 ## Other details
@@ -43,7 +43,7 @@ Listed in `/help` (Games) but **not** in Telegram's "/" command menu.
 * **Close-but-wrong:** a real word of the right length that isn't an answer gets one 🤔 reaction per player and round.
 * Words: WordSeek dictionary (`game/wordseek_data.py`) + `game/jumble_words.py` (themes and 7-8 letter words; add words there - `tests/test_jumble_pure.py` checks them).
 * Games live in memory (`services/jumble.py: GAMES`). A restart drops a free game (paid games are refunded at boot).
-* One game per chat: Jumble, Wordly, Hack and WordSeek block each other - `/end` the running one first.
+* One game per chat: Jumble, Wordly, Hack and WordSeek block each other - `/endgame` the running one first.
 * Plain-message answers need the bot to receive normal group messages (privacy mode off, or the bot is an admin) - same as WordSeek.
 * Tuning knobs: `game/jumble.py` (`ROUND_CHOICES`, `TARGET_CHOICES`, `DIFFS`, `SPEEDS`, `ENTRY_CHOICES`, `LOBBY_S`, `BREAK_S`, `IDLE_ROUNDS`) and `game/jumble_stats.py` (rewards).
 

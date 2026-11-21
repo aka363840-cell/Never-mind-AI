@@ -26,7 +26,7 @@ from utils.targets import resolve_target
 from utils.telegram import safe_answer, safe_edit
 
 router = Router()
-router.include_router(speed_h.router)      # ⚡ /tap /jointap · 💥 /crash /joincrash · /end while a speed game runs
+router.include_router(speed_h.router)      # ⚡ /tap /jointap · 💥 /crash /joincrash · /endgame while a speed game runs
 DIV = "┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈"
 
 
@@ -46,17 +46,17 @@ def _gid() -> str:
 # =============================================================== group word & party games (info cards from the hub)
 GAME_INFO = {
     "ws": "🔎 <b>WordSeek</b> (groups &amp; DM)\nA hidden word, everybody guesses by typing. 🟩 right place · 🟨 wrong place · 🟥 not in the word.\n"
-          "/new (5 letters) · /new4 · /new5 · /new6 · /end · /wlb leaderboard · /myscore · /wordhelp",
-    "wl": "🔠 <b>Wordly</b> (word scramble)\nUse the 8 given letters to make as many words as you can in 2 minutes - first to type a word gets it.\n/wordly or /wl · /end",
+          "/new (5 letters) · /new4 · /new5 · /new6 · /endgame · /wlb leaderboard · /myscore · /wordhelp",
+    "wl": "🔠 <b>Wordly</b> (word scramble)\nUse the 8 given letters to make as many words as you can in 2 minutes - first to type a word gets it.\n/wordly or /wl · /endgame",
     "hk": "🔐 <b>Hack</b> (password cracking, bets 💎)\nCrack the secret code: 🔓 hacks = right digit, right place · ⚡ glitches = right digit, wrong place. Turn-based, winner takes the pot.\n"
-          "/hack3 · /hack4 · /hack5 · /hack6 <i>amount</i> · /joinhack · /hackdaily (daily code) · /hstats · /hlb · /end (host)",
+          "/hack3 · /hack4 · /hack5 · /hack6 <i>amount</i> · /joinhack · /hackdaily (daily code) · /hstats · /hlb · /endgame (host)",
     "wc": "⛓ <b>Word Chain</b> (groups, elimination)\nSay a word starting with the last letter of the previous word. Words get longer and the clock shorter - last one standing wins.\n"
           "Modes: /wc classic · /starthard · /startcfl · /startbl · /startrl · /startelim (see /wcmodes)\n"
-          "/join · /flee · /forcestart · /forcejoin · /extend · /forceskip · /wcstatus · /wchelp · /wcstats · /wclb · /end",
+          "/join · /flee · /forcestart · /forcejoin · /extend · /forceskip · /wcstatus · /wchelp · /wcstats · /wclb · /endgame",
     "jm": "🐙 <b>Word Jumble</b> (rounds or race, rewards 💎)\nUnscramble the word first. Pick difficulty, speed, theme and an optional entry fee.\n"
-          "/jumble or /jum · /jskip · /jlb leaderboard · /jstats · /end",
+          "/jumble or /jum · /jskip · /jlb leaderboard · /jstats · /endgame",
     "ch": "🎭 <b>Charades</b> (groups)\nThe host gets a secret word in DM and describes it with emojis, clues or text - everybody else guesses by typing. After each round a button lets anyone become the next host.\n"
-          "/charades or /describe · /end",
+          "/charades or /describe · /endgame",
 }
 
 
@@ -89,7 +89,7 @@ async def hub(uid: int) -> tuple[str, InlineKeyboardMarkup]:
             "⭕ /ttt <i>[reply/@user]</i> — tic-tac-toe with a friend\n"
             "🤔 /wyr — would you rather? the group votes live\n"
             "🍆 /growdick · /pvp <i>cm</i> · /dicktop — grow daily, fight for cm, group &amp; overall board\n"
-            "🛑 /end — end the running game in the chat\n\n"
+            "🛑 /endgame — end the running game in the chat\n\n"
             "<i>Tap a game for how to play 👇</i>")
     rows = [[B(text="🔎 WordSeek", callback_data="ar:ws"), B(text="🔠 Wordly", callback_data="ar:wl")],
             [B(text="🔐 Hack", callback_data="ar:hk"), B(text="⛓ Word Chain", callback_data="ar:wc")],

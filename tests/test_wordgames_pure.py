@@ -41,7 +41,7 @@ def test_wordly_rack_and_words():
 
 def test_games_are_in_help_but_not_in_the_slash_menu():
     names = {c for c, _ in C.menu("Bot", "*", True)}
-    assert not names & {"wordly", "wl", "hack3", "hack4", "hack5", "hack6", "joinhack", "hackdaily", "hstats", "hlb", "end"}
+    assert not names & {"wordly", "wl", "hack3", "hack4", "hack5", "hack6", "joinhack", "hackdaily", "hstats", "hlb", "endgame"}
     desc = dict(C.DESC_LIST)
     for c in ("wordly", "hack3", "hack4", "hack5", "hack6", "joinhack", "hackdaily", "hstats", "hlb"):
         assert c in desc, c

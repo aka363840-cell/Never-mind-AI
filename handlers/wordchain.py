@@ -5,7 +5,7 @@ START A GAME (each opens a lobby in its own mode - see /wcmodes):
   /startclassic (/wordchain /wc) · /starthard · /startchosenfirstletter [letter] (/startcfl) · /startbannedletters (/startbl)
   /startrequiredletter (/startrl) · /startelimination (/startelim)
 IN THE LOBBY / DURING THE GAME:
-  /join · /flee · /extend [seconds] · /forcestart · /forcejoin (reply) · /forceskip · /wcstatus · /end
+  /join · /flee · /extend [seconds] · /forcestart · /forcejoin (reply) · /forceskip · /wcstatus · /endgame
 STATS:  /wcstats [global|group] [period] · /wclb [global|group] [period]   HELP: /wchelp · /wcmodes
 While it is your turn just type the word in the chat - no command needed (the bot puts a 👍 on accepted words).
 
@@ -89,13 +89,13 @@ async def _open(m: Message, bot: Bot, mode: str, arg: str = "") -> None:
     if m.chat.type == "private":
         raise GameError("⛓ Word Chain needs at least 2 players - start it in a group!")
     if m.chat.id in wc.GAMES:
-        raise GameError("🎮 A Word Chain game is already " + ("running" if wc.GAMES[m.chat.id].state == "playing" else "open") + " here. /end stops it.")
+        raise GameError("🎮 A Word Chain game is already " + ("running" if wc.GAMES[m.chat.id].state == "playing" else "open") + " here. /endgame stops it.")
     from services import wordgames as wg
     if wg.running(m.chat.id):
-        raise GameError("🎮 A Wordly / Hack game is running here - /end it first.")
+        raise GameError("🎮 A Wordly / Hack game is running here - /endgame it first.")
     cur = await ws.get(m.chat.id)                                 # one game per chat: WordSeek reads plain words too
     if cur is not None and ws.idle_for(cur) < ws.IDLE_REPLACE_S:
-        raise GameError("🔎 A WordSeek game is running here - finish it or /end it first.")
+        raise GameError("🔎 A WordSeek game is running here - finish it or /endgame it first.")
     g = wc.create(m.chat.id, m.from_user.id, m.from_user.full_name, mode, arg)     # may raise GameError (bad letter ...)
     if cur is not None:
         await ws.finish(cur)
@@ -289,8 +289,8 @@ async def status_cmd(m: Message):
     await m.reply(wc.status_text(g))
 
 
-# Registered before the WordSeek router: with a Word Chain game running /end is ours, otherwise it falls through to WordSeek.
-@router.message(Command("end", "wend"), _has_game)
+# Registered before the WordSeek router: with a Word Chain game running /endgame is ours, otherwise it falls through to WordSeek.
+@router.message(Command("endgame", "endchain"), _has_game)
 async def end_cmd(m: Message, bot: Bot):
     g = wc.GAMES.get(m.chat.id)
     if g is None or m.from_user is None:
@@ -318,7 +318,7 @@ async def help_cmd(m: Message):
         "<i>See /wcmodes for what each mode does.</i>\n\n"
         "<b>Lobby</b>\n/join · /flee (leave) · /extend [seconds] (host/admin) · /forcestart (host/admin) · /forcejoin (reply, host/admin)\n\n"
         "<b>During the game</b>\nJust type your word when it's your turn - a 👍 means it counted.\n"
-        "/wcstatus - who's alive, whose turn, last words\n/flee - give up · /forceskip - knock out the current player (host/admin) · /end - stop the game (host/admin)\n\n"
+        "/wcstatus - who's alive, whose turn, last words\n/flee - give up · /forceskip - knock out the current player (host/admin) · /endgame - stop the game (host/admin)\n\n"
         "<b>Stats</b>\n/wcstats [global|group] [today|week|month|all] - your stats (reply to see someone else's)\n/wclb [global|group] [today|week|month|all] - leaderboard\n\n"
         "Words must be real English words and can't be used twice. Classic mode: the words get longer and the clock shorter as the game goes on.")
 

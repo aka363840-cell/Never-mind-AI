@@ -1,6 +1,6 @@
 """🎭 Charades (describe it!) - group game.
 
-/charades or /describe - start (you are the first host) · /end - end the game (host or group admin)
+/charades or /describe - start (you are the first host) · /endgame - end the game (host or group admin)
 The host gets a secret word in DM and describes it in the group with emojis, clues or text (never the word itself).
 Everybody else guesses by typing. After a correct guess a button lets anybody become the next host - and so it goes on.
 Listed in /help, deliberately NOT in Telegram's '/' menu (utils/helpcatalog.MENU).
@@ -135,7 +135,7 @@ async def start_cmd(m: Message, bot: Bot):
     from services import wordgames as wg
     other = await wg.busy(m.chat.id)
     if other:
-        raise GameError(f"🎮 A {other} game is running here - finish it or /end it first.")
+        raise GameError(f"🎮 A {other} game is running here - finish it or /endgame it first.")
     g = cs.Game(m.chat.id, m.from_user.id, m.from_user.full_name, m.from_user.id)
     cs.GAMES[m.chat.id] = g
     try:
@@ -154,7 +154,7 @@ async def _is_admin(bot: Bot, chat_id: int, uid: int) -> bool:
     return await adm(bot, chat_id, uid)
 
 
-@router.message(Command("end", "wend"), _has_game)
+@router.message(Command("endgame", "endcharades"), _has_game)
 async def end_cmd(m: Message, bot: Bot):
     g = cs.GAMES.get(m.chat.id)
     if g is None or m.from_user is None:

@@ -8,7 +8,7 @@ Use the given 8 letters to make as many words as you can!
 | Command | What it does |
 |---|---|
 | `/wordly` or `/wl` | Start a new game (groups and DMs). |
-| `/end` | End the game early (the player who started it, or a group admin). |
+| `/endgame` | End the game early (the player who started it, or a group admin). |
 
 * The bot posts 8 letters. Everybody just types words in the chat - 3 to 8 letters, each letter used at most as often as it appears.
 * 3 letters = 1 pt · 4 = 2 · 5 = 4 · 6 = 7 · 7 = 11 · 8 = 16. About half of the racks are an 8-letter word shuffled, so a full-rack word exists. Every word counts once - the first player to type it gets it.
@@ -26,7 +26,7 @@ Crack the secret password! Each guess gives you **hacks** (right digit, right po
 | `/hack5 <amount>` | 5-digit code |
 | `/hack6 <amount>` | 6-digit code |
 | `/joinhack` | Join an open lobby (same bet as the host) |
-| `/end` | End the game (**host only**) - everybody is refunded |
+| `/endgame` | End the game (**host only**) - everybody is refunded |
 
 * Groups only. The host's bet opens a lobby (2-6 players); it starts after 60 s with 2+ players, or when the host taps **Start**.
 * The code has all-different digits (a leading 0 is possible). Players guess in turn by typing the code in the chat; every guess is public.
@@ -39,8 +39,8 @@ Crack the secret password! Each guess gives you **hacks** (right digit, right po
   `services.wordgames.recover_orphans()` runs at boot and refunds the bets of any game that was interrupted by a restart. No new tables.
 
 ## Notes
-* One game per chat: Wordly, Hack and WordSeek block each other (`/end` the running one first).
-* `/end` is shared with WordSeek: if a Wordly/Hack game is running it ends that one, otherwise it is WordSeek's `/end` as before.
+* One game per chat: Wordly, Hack and WordSeek block each other (`/endgame` the running one first).
+* `/endgame` is shared with WordSeek: if a Wordly/Hack game is running it ends that one, otherwise it is WordSeek's `/endgame` as before.
 * As with WordSeek, plain-message guesses need the bot to see normal group messages (privacy mode off, or the bot is an admin).
 
 ## Hack stats, ranks and the daily code

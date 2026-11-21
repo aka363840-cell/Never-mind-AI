@@ -121,7 +121,7 @@ def test_commands_are_in_help_menu_and_games_category():
         assert any(c in cmds for title, cmds in H.CATEGORIES if title == "🕹 Games"), c
         assert sum(c in cmds for _, cmds in H.CATEGORIES) == 1, c
     assert {"tap", "crash"} <= set(H.MENU) and not {"jointap", "joincrash", "taptop", "crashtop"} & set(H.MENU)
-    assert "end" in H.DESC and "Tap" in H.DESC["end"] and "WordSeek" in H.DESC["end"]
+    assert "endgame" in H.DESC and "Tap" in H.DESC["endgame"] and "WordSeek" in H.DESC["endgame"]
     dm, grp = H.menu("Bot", "*", False), H.menu("Bot", "*", True)
     assert 20 <= len(dm) <= 40 and len(grp) <= 100
     assert {c for c, _ in dm} >= {"tap", "crash"}
@@ -139,7 +139,7 @@ def _commands_of(path: str) -> list[list[str]]:
 
 
 def test_handler_registers_exactly_the_documented_commands():
-    assert sorted(sum(_commands_of("handlers/speedgames.py"), [])) == ["crash", "crashtop", "end", "joincrash", "jointap", "tap", "taptop"]
+    assert sorted(sum(_commands_of("handlers/speedgames.py"), [])) == ["crash", "crashtop", "endcrash", "endgame", "endtap", "joincrash", "jointap", "tap", "taptop"]
 
 
 def test_router_wiring_keeps_bot_py_untouched_and_end_before_wordseek():
@@ -149,7 +149,7 @@ def test_router_wiring_keeps_bot_py_untouched_and_end_before_wordseek():
     bot = _read("bot.py")
     assert "speedgames" not in bot                                                   # nothing to register there: the arcade router carries it
     line = next(l for l in bot.splitlines() if l.strip().startswith("routers = ["))
-    assert line.index("arcade_h.router") < line.index("wordseek_h.router") < line.index("ai_chat.router")   # our /end (only while a speed game runs) beats WordSeek's
+    assert line.index("arcade_h.router") < line.index("wordseek_h.router") < line.index("ai_chat.router")   # our /endgame (only while a speed game runs) beats WordSeek's
     src = _read("handlers/speedgames.py")
     assert "RunningSpeedGame()" in src and "outer_middleware(CrashAnswerMiddleware())" in src
 

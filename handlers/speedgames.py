@@ -2,13 +2,13 @@
 
 ⚡ Fastest Tap   /tap <amount|free>    open a lobby · /jointap   join · /taptop   leaderboard
 💥 Crash Count   /crash <amount|free>  open a lobby · /joincrash join · /crashtop leaderboard
-🛑 /end          ends the running speed game (host or group admin, entries are refunded); admins also end a running WordSeek with it.
+🛑 /endgame          ends the running speed game (host or group admin, entries are refunded); admins also end a running WordSeek with it.
 
 A match is best of 3 (first to 2 round wins, at most 5 rounds). The entries are held in escrow when the match starts and settled once
 at the end (services/speedgames.py). `free` = practice: no diamonds, can be played alone.
 
 The router is attached to the arcade router (handlers/arcade.py: `router.include_router(...)`), so bot.py needs no change and the
-/end below is tried BEFORE WordSeek's /end (it only matches while a speed game is running in the chat).
+/endgame below is tried BEFORE WordSeek's /endgame (it only matches while a speed game is running in the chat).
 Crash answers are plain numbers typed in the chat; CoreMiddleware drops unaddressed group chatter, so they are read by an OUTER
 middleware of this router (the same trick WordSeek uses) - everything that is not a live answer passes through untouched.
 Rules and numbers: game/speedgames.py.  The word picture: utils/crashcard.py.
@@ -52,7 +52,7 @@ def _usage(kind: str) -> str:
     return (f"{m['emoji']} <b>{m['title']}</b> - best of 3 for diamonds (groups, min. {G.MIN_PLAYERS} players)\n"
             f"/{m['cmd']} <code>&lt;amount&gt;</code> - open a lobby, everybody puts in the same entry\n"
             f"/{m['cmd']} <code>free</code> - practice: no diamonds, you can even play alone\n"
-            f"/{m['join']} - join the lobby · /{m['top']} - leaderboard\n/end - end the game (entries are refunded)\n\nExample: <code>/{m['cmd']} 100</code>")
+            f"/{m['join']} - join the lobby · /{m['top']} - leaderboard\n/endgame - end the game (entries are refunded)\n\nExample: <code>/{m['cmd']} 100</code>")
 
 
 # ------------------------------------------------------------------ small telegram helpers
@@ -105,7 +105,7 @@ def _lobby_text(g: svc.Game) -> str:
             f"({G.FEE_PCT:.0%} is burned); everybody gets the entry back if nobody wins. " if not g.practice else "")
     return (f"{m['emoji']} <b>{m['title']}</b> - lobby open!\n{DIV}\n"
             f"{_mode(g)} · 👥 <b>{len(g.players)}/{G.MAX_PLAYERS}</b> players (min. {floor})\n{_rules_line(g)}\n{inv}\n{people}\n\n"
-            f"{m['how']}\n\n<i>Join with the button or /{m['join']}. It starts by itself in {G.LOBBY_S} s. {tail}Host or admins: /end.</i>")
+            f"{m['how']}\n\n<i>Join with the button or /{m['join']}. It starts by itself in {G.LOBBY_S} s. {tail}Host or admins: /endgame.</i>")
 
 
 def _lobby_kb(g: svc.Game) -> InlineKeyboardMarkup:
@@ -121,7 +121,7 @@ async def _refresh_lobby(bot: Bot, g: svc.Game) -> None:
 async def _open_lobby(bot: Bot, chat_id: int, uid: int, name: str, kind: str, amount: int, invited: list[tuple[int, str]] | None = None) -> svc.Game:
     from services import wordgames as wg                          # one game at a time per chat (all games)
     if (other := await wg.busy(chat_id)) and svc.get(chat_id) is None:
-        raise GameError(f"🎮 A {other} game is running here - finish it or /end it first.")
+        raise GameError(f"🎮 A {other} game is running here - finish it or /endgame it first.")
     g = svc.new(kind, chat_id, uid, name, amount)          # reserve the chat first: two /tap at once -> one lobby
     g.invited = list(invited or [])
     try:
@@ -275,7 +275,7 @@ async def _match(bot: Bot, g: svc.Game) -> None:
         while True:
             g.round_no += 1
             rid = await (_tap_round if g.kind == "tap" else _crash_round)(bot, g)
-            if g.phase == "done":                                  # /end during the round
+            if g.phase == "done":                                  # /endgame during the round
                 return
             if rid is not None:
                 g.scores[rid] += 1
@@ -453,7 +453,7 @@ async def _crash_round(bot: Bot, g: svc.Game) -> int | None:
         msg = await bot.send_message(g.chat_id, f"💥 <b>The word:</b> <code>{' '.join(ch.word)}</code>\n{caption}")
     g.round_msg = msg.message_id
     async with g.lock:
-        if g.phase != "ready":                                     # /end during the countdown
+        if g.phase != "ready":                                     # /endgame during the countdown
             return None
         g.phase = "live"
         g.t0 = time.monotonic()
@@ -554,15 +554,15 @@ async def crashtop_cmd(m: Message, db_user: User):
     await _top(m, "crash", db_user.id)
 
 
-# ------------------------------------------------------------------ /end (shared with WordSeek)
+# ------------------------------------------------------------------ /endgame (shared with WordSeek)
 class RunningSpeedGame(Filter):
-    """Matches only while a speed game runs in this chat, so WordSeek's own /end still gets every other /end."""
+    """Matches only while a speed game runs in this chat, so WordSeek's own /endgame still gets every other /endgame."""
 
     async def __call__(self, message: Message) -> bool:
         return svc.get(message.chat.id) is not None
 
 
-@router.message(Command("end"), RunningSpeedGame())
+@router.message(Command("endgame", "endtap", "endcrash"), RunningSpeedGame())
 async def end_cmd(m: Message, bot: Bot):
     from handlers.members import _is_admin
     g = svc.get(m.chat.id)
@@ -580,7 +580,7 @@ async def end_cmd(m: Message, bot: Bot):
     await _unbutton(bot, g.chat_id, g.lobby_msg)
     await _unbutton(bot, g.chat_id, g.round_msg)
     text = f"🛑 {meta['emoji']} <b>{meta['title']}</b> ended. " + ("Every entry was refunded." if held else "No diamonds moved.")
-    if admin:                                                      # /end = "end any active game": a running WordSeek goes too (admins only, as before)
+    if admin:                                                      # /endgame = "end any active game": a running WordSeek goes too (admins only, as before)
         try:
             from services import wordseek as ws
             st = await ws.get(m.chat.id)

@@ -1,7 +1,7 @@
 """Word Chain stats: one row per player per finished game -> /wcstats and /wclb (any period, group or global).
 
 The table is created on first use (CREATE TABLE IF NOT EXISTS), so installing this addon needs no migration and no
-change to database/models.py or bot.py.  An aborted game (/end) is never counted.
+change to database/models.py or bot.py.  An aborted game (/endgame) is never counted.
 """
 from __future__ import annotations
 

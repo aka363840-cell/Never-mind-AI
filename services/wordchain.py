@@ -90,7 +90,7 @@ class Move:
 
 def create(chat_id: int, host_id: int, host_name: str, mode: str = W.DEFAULT_MODE, letter: str = "") -> Game:
     if chat_id in GAMES:
-        raise GameError("🎮 A Word Chain game is already " + ("running" if GAMES[chat_id].state == "playing" else "open") + " here. /end stops it.")
+        raise GameError("🎮 A Word Chain game is already " + ("running" if GAMES[chat_id].state == "playing" else "open") + " here. /endgame stops it.")
     if mode not in W.MODES:
         raise GameError("❓ Unknown mode. See /wcmodes")
     spec = W.MODES[mode]
@@ -148,7 +148,7 @@ def lobby_text(g: Game) -> str:
     return (f"⛓ <b>Word Chain</b> - lobby open!\n\n{rules_line(g)}{extra}\n\n"
             f"👥 <b>Players ({len(g.players)}/{W.MAX_PLAYERS})</b>\n{names}\n\n"
             f"⏳ Starts in about <b>{lobby_left(g)}s</b> (min {W.MIN_PLAYERS} players)\n"
-            f"/join · /flee · /extend · /forcestart · /end")
+            f"/join · /flee · /extend · /forcestart · /endgame")
 
 
 def start_lobby_timer(g: Game, send: Send) -> None:
@@ -477,7 +477,7 @@ async def _finish(g: Game, send: Send, winner: Player | None, prefix: str = "") 
 
 
 async def end(g: Game, send: Send, by: str = "") -> None:
-    """Stop the game now (/end). An aborted game is not counted in the stats."""
+    """Stop the game now (/endgame). An aborted game is not counted in the stats."""
     async with g.lock:
         was = g.state
         if GAMES.get(g.chat_id) is not g:

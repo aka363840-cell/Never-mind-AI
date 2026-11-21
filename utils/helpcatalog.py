@@ -45,7 +45,7 @@ DESC_LIST: list[tuple[str, str]] = [
     ('members', '👥 Admins: what I know about this group + /members scan to find everyone'),
     ('q', '💬 Quote sticker: reply with /q · /q 3 (more messages) · /q red|#cbafff|random · /q r (keep the replied-to message)'),
     ('new', '🔎 WordSeek word game: /new (5 letters) · /new4 · /new5 · /new6 - then just type words (🟩🟨🟥), first to find it wins'),
-    ('end', '🛑 End the running game: WordSeek (group admins) · Wordly (starter or admins) · Hack (host only) · Jumble (starter or admins) · Word Chain (lobby starter or admins) · Charades (host or admins) · Fastest Tap / Crash Count (host or admins)'),
+    ('endgame', '🛑 End the running game (own name so other bots\' /end is not affected; also /endseek /endwordly /endhack /endjumble /endchain /endcharades /endtap /endcrash): WordSeek (group admins) · Wordly (starter or admins) · Hack (host only) · Jumble (starter or admins) · Word Chain (lobby starter or admins) · Charades (host or admins) · Fastest Tap / Crash Count (host or admins)'),
     ('wordchain', '⛓ Word Chain (groups): classic mode - say a word starting with the last letter of the previous word, slow or stuck = eliminated, last one standing wins. Words get longer and the clock shorter! /wc opens the lobby'),
     ('starthard', '🔥 Word Chain HARD mode: starts at 5+ letters, a new level every round and a much shorter clock'),
     ('startchosenfirstletter', '🔤 Word Chain: every word of the game must start with ONE letter - random, or pick it yourself: /startcfl k'),
@@ -228,7 +228,7 @@ DESC: dict[str, str] = dict(DESC_LIST)
 # primary command -> its alternative spellings (taken from the handlers)
 ALIASES: dict[str, tuple[str, ...]] = {
     '8ball': ('ask8',),
-    'end': ('wend',),
+    'endgame': ('endseek', 'endwordly', 'endhack', 'endjumble', 'endchain', 'endcharades', 'endtap', 'endcrash'),
     'wordhelp': ('whelp',),
     'wlb': ('wleaderboard', 'wordtop'),
     'myscore': ('score', 'wscore'),
@@ -378,7 +378,7 @@ CATEGORIES: list[tuple[str, list[str]]] = [
               "wordly", "hack3", "hack4", "hack5", "hack6", "joinhack", "hackdaily", "hstats", "hlb", "jumble", "jlb", "jstats", "jskip",
               "new", "wlb", "myscore", "wordhelp", "wordchain", "starthard", "startchosenfirstletter", "startbannedletters", "startrequiredletter", "startelimination",
               "join", "flee", "extend", "forcestart", "forcejoin", "forceskip", "wcstatus", "wcmodes", "wchelp", "wcstats", "wclb",
-              "charades", "growdick", "pvp", "dicktop", "end"]),
+              "charades", "growdick", "pvp", "dicktop", "endgame"]),
     ("🏆 Progress & Ranking", ["top", "missions", "achievements", "rep", "toprep"]),
     ("💍 Love & Family", ["marry", "engage", "wedding", "anniversary", "sendgift", "loveletter", "honeymoon", "couplequest", "lovestreak", "couple", "date", "gift", "gifts", "baby", "divorce", "adopt", "disown", "family",
                           "familytree", "addfamily", "unfamily", "roles", "gender", "familybonus", "ship",

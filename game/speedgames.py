@@ -6,7 +6,7 @@ Both are best-of-3 matches (first to 2 round wins, at most MAX_ROUNDS rounds); `
 
 Money rule: every player's entry is HELD (escrow, ledgered) when the match starts and settled once at the end:
   winner  -> gets every other player's entry minus FEE_PCT (burned) and his own entry back
-  nobody / /end / a crash -> every entry is refunded
+  nobody / /endgame / a crash -> every entry is refunded
   a winner/loser pair that already played PAIR_DAILY paid games in 24 h -> that loser's entry is refunded (anti alt-farming)
 """
 from __future__ import annotations

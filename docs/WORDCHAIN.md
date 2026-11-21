@@ -38,7 +38,7 @@ While it's your turn just **type the word** - no command. An accepted word gets 
 |---|---|---|
 | `/wcstatus` (`/wcinfo`) | anyone | whose turn, who is alive, last words |
 | `/forceskip` | game starter / admins | knock out the player whose turn it is |
-| `/end` (`/wend`) | game starter / admins | stop the game (not counted in stats) |
+| `/endgame` (`/wend`) | game starter / admins | stop the game (not counted in stats) |
 
 **Stats** (kept in the database, table `wordchain_results`)
 
@@ -66,7 +66,7 @@ While it's your turn just **type the word** - no command. An accepted word gets 
 ## Design notes
 
 * One game per chat. A running WordSeek / Wordly / Hack game blocks `/startX` (they all read plain chat messages).
-* Games live in memory (minutes long). A redeploy ends them; finished games are saved, aborted ones (`/end`) are not.
+* Games live in memory (minutes long). A redeploy ends them; finished games are saved, aborted ones (`/endgame`) are not.
 * A failing stats save can never break a game (`services.wordchain.recorder` is wrapped in try/except).
 * Dead ends are handled: when no unused word is left for a letter the chain restarts with a new letter
   (chosen-first-letter mode, where the letter can't change, ends the game instead).

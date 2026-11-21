@@ -124,7 +124,7 @@ def test_lobby_rules():
 def test_lobby_text_lists_the_commands_and_the_mode():
     g, _ = _setup(2, "hard")
     t = wc.lobby_text(g)
-    for c in ("/join", "/flee", "/extend", "/forcestart", "/end", "Hard", "P1"):
+    for c in ("/join", "/flee", "/extend", "/forcestart", "/endgame", "Hard", "P1"):
         assert c in t, c
 
 
@@ -449,11 +449,11 @@ def test_no_wordchain_command_is_in_the_slash_menu_but_all_are_in_help():
     from utils import helpcatalog as H
     cmds = set(_handler_commands())
     assert {"startclassic", "wc", "starthard", "startcfl", "startbl", "startrl", "startelim", "join", "flee", "extend", "forcestart",
-            "forceskip", "forcejoin", "wcstats", "wclb", "wchelp", "wcmodes", "wcstatus", "end"} <= cmds
+            "forceskip", "forcejoin", "wcstats", "wclb", "wchelp", "wcmodes", "wcstatus", "endgame"} <= cmds
     assert set(W.START_COMMANDS) <= cmds                                                        # every mode's command really has a handler
     shown = {c for c, _ in H.menu("Bot", "*", False)} | {c for c, _ in H.menu("Bot", "*", True)} | set(H.MENU) | set(H.GROUP_MENU_EXTRA)
-    assert not (cmds - {"end"}) & shown, sorted((cmds - {"end"}) & shown)                       # (/end is old and not in the menu either)
-    assert "end" not in shown
+    assert not (cmds - {"endgame"}) & shown, sorted((cmds - {"endgame"}) & shown)                       # (/endgame is old and not in the menu either)
+    assert "endgame" not in shown
     listed = {c for c, _, _ in H.entries("Bot", "*")} | {a for _, _, al in H.entries("Bot", "*") for a in al}
     assert cmds <= listed, sorted(cmds - listed)                                                # ... but /help lists every single one
     for c in W.START_COMMANDS:

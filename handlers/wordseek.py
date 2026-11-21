@@ -62,9 +62,9 @@ async def _is_admin(bot: Bot, m: Message) -> bool:
 async def _start(m: Message, bot: Bot, length: int = W.DEFAULT_LEN) -> None:
     from services import wordchain as wc, wordgames as wg      # Wordly / Hack / Word Chain: one game per chat
     if m.chat.id in wc.GAMES:
-        raise GameError("⛓ A Word Chain game is running here - finish it or /end it first.")
+        raise GameError("⛓ A Word Chain game is running here - finish it or /endgame it first.")
     if wg.running(m.chat.id):
-        await m.reply("🎮 A Wordly / Hack game is running here - /end it first.")
+        await m.reply("🎮 A Wordly / Hack game is running here - /endgame it first.")
         return
     cur = await ws.get(m.chat.id)
     note = ""
@@ -96,7 +96,7 @@ async def new_cb(cb: CallbackQuery, bot: Bot):
     if cb.message.chat.id in wc.GAMES:
         return await cb.answer("A Word Chain game is running here!", show_alert=True)
     if wg.running(cb.message.chat.id):
-        return await cb.answer("A Wordly / Hack game is running here - /end it first.", show_alert=True)
+        return await cb.answer("A Wordly / Hack game is running here - /endgame it first.", show_alert=True)
     tail = cb.data[6:]
     length = int(tail) if tail.isdigit() and int(tail) in W.LENGTHS else W.DEFAULT_LEN
     cur = await ws.get(cb.message.chat.id)
@@ -113,7 +113,7 @@ async def new_cb(cb: CallbackQuery, bot: Bot):
     await cb.message.answer(f"🔎 <b>WordSeek</b> - new game started by {mention(cb.from_user.id, cb.from_user.full_name)}!\n\n" + _intro(length))
 
 
-@router.message(Command("end", "wend"))
+@router.message(Command("endgame", "endseek"))
 async def end_cmd(m: Message, bot: Bot):
     st = await ws.get(m.chat.id)
     if st is None:
@@ -224,7 +224,7 @@ async def stats_cmd(m: Message):
 @router.message(Command("wordhelp", "whelp"))
 async def help_cmd(m: Message):
     await m.reply("🔎 <b>WordSeek</b> - guess the hidden 5-letter word together!\n\n"
-                  "/new - start a 5-letter game (anyone, groups or DM)\n/new4 · /new5 · /new6 - choose 4, 5 or 6 letters\n/end - end the game (group admins)\n"
+                  "/new - start a 5-letter game (anyone, groups or DM)\n/new4 · /new5 · /new6 - choose 4, 5 or 6 letters\n/endgame - end the game (group admins)\n"
                   "/wlb [global|group] [today|week|month|all] - leaderboard\n/myscore [period] - your score (reply to see someone else's)\n\n"
                   "<b>How to play</b>: after /new just type words of that length. 🟩 right letter in the right place · 🟨 right letter, wrong place · 🟥 not in the word.\n"
                   "Guesses per game: 25 (4 letters) · 30 (5) · 35 (6). The winner earns the limit + 6 − guesses used (at least 5). Fewer guesses = more points!")
