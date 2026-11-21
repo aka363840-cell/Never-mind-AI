@@ -24,7 +24,7 @@ PAGES = {
 }
 
 
-async def render(name: str, user: User):
+async def _render(name: str, user: User):
     if name == "modhelp":
         rows: list = []
         try:                                        # moderation is a separate optional module; never let /start break if it's missing
@@ -58,6 +58,34 @@ async def render(name: str, user: User):
     if name == "academy":
         return await views.academy_help(user.id)
     raise GameError("❌ Unknown page.")
+
+
+# every start page gets "📖 All commands" buttons that open the matching /help categories, so no command is out of reach
+PAGE_HELP = {
+    "profile": ("Basics",), "balance": ("Economy", "Property"), "powers": ("Shop",), "shop": ("Shop",),
+    "missions": ("Progress",), "combat": ("Combat",), "clan": ("Clans",), "pet": ("Adventure",), "realm": ("Adventure",),
+    "casino": ("Casino",), "fun": ("Social", "Games"), "family": ("Love",), "academy": ("Academy",), "ai": ("AI Chat",),
+    "arcade": ("Games",),
+}
+
+
+async def render(name: str, user: User):
+    text, markup = await _render(name, user)
+    try:
+        secs = views._help_sections()
+        btns = []
+        for key in PAGE_HELP.get(name, ()):
+            for i, (title, _) in enumerate(secs):
+                if key in title:
+                    btns.append(B(text=f"📖 All {title.replace('🎓', '').strip()} commands", callback_data=f"help:c{i}"))
+                    break
+        if btns and markup is not None:
+            rows = [list(r) for r in markup.inline_keyboard]
+            rows[-1:-1] = [[b] for b in btns]            # just above the last (Back / Menu) row
+            markup = InlineKeyboardMarkup(inline_keyboard=rows)
+    except Exception:
+        log.exception("could not add the help shortcut buttons")
+    return text, markup
 
 
 VIDEO_PATH = Path(__file__).resolve().parent.parent / "assets" / "start_intro.mp4"
