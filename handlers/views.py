@@ -572,7 +572,7 @@ def group_tools() -> tuple[str, InlineKeyboardMarkup]:
             "/tagall · /etagall — tag everyone (or @all / @eall) · /cancel — stop tagging\n"
             "/q — quote sticker (reply to a message) · /members — what I know about the group\n"
             "/welcomemsg · /leavemsg — admins: welcome / leaving message on or off\n\n"
-            "🛡 Admins: moderation commands are under the <b>Moderation</b> button.\n🕹 Games: the <b>Games</b> button · /games"), kb([back()])
+            "🛡 Admins: moderation commands are under the <b>Moderation</b> button.\n🕹 Games: the <b>Games</b> button · /games"), kb([[B(text="👋 Welcome & Leave on/off", callback_data="wl:page")], back()])
 
 
 async def academy_help(uid: int) -> tuple[str, InlineKeyboardMarkup]:
