@@ -11,7 +11,7 @@ from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton
 from . import actions, confirm, perms, store
 from .base import COMMANDS, HELP, command, prepare, reply, router, throttled
 from .perms import ModError, esc, tg
-from .util import fmt_duration, mention
+from .util import edit_in_place, fmt_duration, mention
 
 log = logging.getLogger("moderation.misc")
 
@@ -305,8 +305,5 @@ async def help_cb(cb: CallbackQuery):
         kb = InlineKeyboardMarkup(inline_keyboard=[[B(text="⬅️ Back", callback_data="mod:h:menu")]])
     else:
         return await cb.answer()
-    try:
-        await cb.message.edit_text(text, reply_markup=kb)
-    except Exception:
-        pass
+    await edit_in_place(cb.message, text, kb)
     await cb.answer()

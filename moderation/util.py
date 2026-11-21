@@ -83,3 +83,28 @@ def strip_command(html_text: str) -> str:
 
 def short_id(n: int) -> str:
     return f"{int(n):d}"
+
+
+async def edit_in_place(msg, text: str, kb=None) -> None:
+    """Edit a bot message to a new page. A text message: edit_text. A video/photo message (the /start card): edit its caption in place
+    (<= 1024 chars), otherwise replace it with a text message. Never raises."""
+    from aiogram.exceptions import TelegramBadRequest
+    try:
+        await msg.edit_text(text, reply_markup=kb, disable_web_page_preview=True)
+        return
+    except TelegramBadRequest as e:
+        err = str(e).lower()
+        if "not modified" in err:
+            return
+        if "no text in the message" not in err:
+            return
+    except Exception:
+        return
+    try:
+        if len(text) <= 1000:
+            await msg.edit_caption(caption=text, reply_markup=kb)
+            return
+        await msg.delete()
+        await msg.answer(text, reply_markup=kb)
+    except Exception:
+        pass
