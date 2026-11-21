@@ -195,6 +195,14 @@ async def start(m: Message, command: CommandObject, bot: Bot, db_user: User):
 async def group_home(cb: CallbackQuery, bot: Bot, db_user: User):
     """Back to the start card (video + description) from any hub page in a group."""
     msg = cb.message
+    if msg is not None and msg.video is not None:                       # the start card is still a video message: put its caption back in place
+        text, markup = await views.welcome(db_user.first_name, True, None)
+        try:
+            await msg.edit_caption(caption=text, reply_markup=markup)
+            return await safe_answer(cb)
+        except TelegramBadRequest as e:
+            if "not modified" in str(e).lower():
+                return await safe_answer(cb)
     try:
         await msg.delete()
     except Exception:

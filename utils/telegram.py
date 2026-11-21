@@ -31,8 +31,15 @@ async def safe_edit(cb: CallbackQuery, text: str, kb: InlineKeyboardMarkup | Non
         if "not modified" in str(e).lower():
             return
         try:
-            if "no text in the message" in str(e).lower():     # media (video) message: swap it for the page, no leftover
-                try:
+            if "no text in the message" in str(e).lower():     # media (video) message
+                if len(text) <= 1000:                          # short page: edit the caption in place - same message, same spot
+                    try:
+                        await cb.message.edit_caption(caption=text, reply_markup=kb)
+                        return
+                    except TelegramBadRequest as e2:
+                        if "not modified" in str(e2).lower():
+                            return
+                try:                                           # long page: swap the video for it, no leftover
                     await cb.message.delete()
                 except Exception:
                     pass
