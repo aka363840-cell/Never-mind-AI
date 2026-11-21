@@ -26,14 +26,3 @@ def caption(owner: str, waifu: str, bond: int, seconds_left: int) -> str:
             f"┊ {tier(bond)}\n"
             "╰──────────────\n"
             f"<i>🕒 New pick in {left_text(seconds_left)}</i>")
-
-
-def wife_caption(owner: str, wife: str, slot: int) -> str:
-    """HTML caption for the owner's own wife (no timer, no random bond). owner / wife are ready-made HTML."""
-    return (f"✨ {owner}'s Wife ✨\n\n"
-            "╭──────────────\n"
-            f"┊ 💖 {wife}\n"
-            f"┊ 💗 Bond <b>100%</b>  {bar(100)}\n"
-            f"┊ {tier(100)}\n"
-            "╰──────────────\n"
-            "<i>💍 Forever · no timer</i>")

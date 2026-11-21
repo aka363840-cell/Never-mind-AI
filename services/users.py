@@ -77,12 +77,6 @@ async def require(s: AsyncSession, uid: int) -> User:
     return u
 
 
-async def find_name(uid: int) -> str | None:
-    async with db.tx() as s:
-        u = await s.get(User, uid)
-        return u.first_name if u else None
-
-
 async def find_by_username(username: str) -> int | None:
     async with db.tx() as s:
         return (await s.execute(select(User.id).where(User.username_lc == username.lower().lstrip("@")))).scalar()

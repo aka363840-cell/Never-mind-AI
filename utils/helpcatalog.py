@@ -18,7 +18,7 @@ from game.rules import R
 STAFF = frozenset({
     "admin", "stats", "backup", "backupdb", "restoredb", "give", "take", "setbalance", "resetdiamonds", "ban", "unban", "mute",
     "unmute", "userinfo", "logs", "maintenance", "broadcast", "syncusers", "emojiid", "seticon", "delicon", "aitest", "drop",
-    "boss", "wordstats", "wife", "wives", "purgeadopted", "academyadvance", "academyreset",
+    "boss", "wordstats", "purgeadopted", "academyadvance", "academyreset",
     "gameban", "gameunban", "gamemute", "gameunmute", "botban", "botunban", "botmute", "botunmute",
 })
 

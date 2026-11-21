@@ -14,9 +14,3 @@ def test_caption_has_the_pieces():
     c = caption("<b>Kartik</b>", "<b>Auvril</b>", 58, 86400)
     assert "<b>Kartik</b>'s Today's Waifu" in c and "<b>Auvril</b>" in c and "58%" in c and "24h 00m" in c
     assert len(c) < 1024                       # photo captions are capped at 1024 characters
-
-
-def test_wife_caption_has_no_timer_and_full_bond():
-    from game.waifu_text import wife_caption
-    t = wife_caption("<b>Owner</b>", "<b>Her</b>", 1)
-    assert "Her" in t and "100%" in t and "New pick in" not in t

@@ -74,30 +74,7 @@ async def _discover(chat_id: int, owner_id: int, check, admins) -> None:
             await insert_ignore(s, GroupMember, dict(chat_id=chat_id, user_id=uid))
 
 
-WIVES_KEY = "owner_wives"
-
-
-async def wives() -> list[int]:
-    """The owner's two wives (slot 1, slot 2); 0 = not set. Kept in app_state, so it is in every backup."""
-    import json
-    from services import users
-    try:
-        v = json.loads(await users.get_state(WIVES_KEY, "[0,0]"))
-        return [int(v[0]), int(v[1])]
-    except Exception:
-        return [0, 0]
-
-
-async def set_wife(slot: int, uid: int) -> None:
-    import json
-    from services import users
-    cur = await wives()
-    cur[slot - 1] = uid
-    async with db.tx() as s:
-        await users.set_state(s, WIVES_KEY, json.dumps(cur))
-
-
-async def pick(owner_id: int, chat_id: int | None, check=None, admins=None, unlimited: bool = False) -> Result:
+async def pick(owner_id: int, chat_id: int | None, check=None, admins=None) -> Result:
     """check: optional async callable (uid, strict) -> bool ("is this person in the group?"; strict=True treats errors as no).
     admins: optional async callable -> list of the group's human admin ids. Candidates are tried in random order until one
     passes; the ones that don't are dropped from this group's roster. A thin roster triggers a discovery scan (_discover)."""
@@ -106,7 +83,7 @@ async def pick(owner_id: int, chat_id: int | None, check=None, admins=None, unli
         now = utcnow()
         async with db.tx() as s:
             row = await s.get(WaifuPick, owner_id)
-            if not unlimited and row and aware(row.picked_at) + timedelta(hours=HOURS) > now:      # unlimited (owner's wives): a fresh pick every time
+            if row and aware(row.picked_at) + timedelta(hours=HOURS) > now:
                 w = await s.get(User, row.waifu_id)
                 left = int((aware(row.picked_at) + timedelta(hours=HOURS) - now).total_seconds())
                 return Result(True, waifu_id=row.waifu_id, waifu_name=w.first_name if w else "Someone", bond=row.bond, seconds_left=left)
