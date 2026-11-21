@@ -11,7 +11,7 @@ from datetime import timedelta
 
 from sqlalchemy import func, select, update
 
-from database.models import DickChallenge, DickChat, DickPlayer, User, aware, utcnow
+from database.models import DickChallenge, DickChat, DickPlayer, GroupMember, User, aware, utcnow
 from database.session import db, insert_ignore
 from services import cooldowns
 from services.errors import GameError
@@ -52,10 +52,16 @@ async def _note_chat(s, chat_id: int | None, uid: int) -> None:
         await insert_ignore(s, DickChat, dict(chat_id=chat_id, user_id=uid))
 
 
+def _in_chat(chat_id: int):
+    """Belongs to this group's board: played here OR is a member the bot knows here (so a size grown in another group shows too)."""
+    return (DickPlayer.user_id.in_(select(DickChat.user_id).where(DickChat.chat_id == chat_id))
+            | DickPlayer.user_id.in_(select(GroupMember.user_id).where(GroupMember.chat_id == chat_id)))
+
+
 async def _rank(s, uid: int, size: int, chat_id: int | None) -> int:
     q = select(func.count()).select_from(DickPlayer).join(User, User.id == DickPlayer.user_id).where(_visible(), DickPlayer.size > size)
     if chat_id:
-        q = q.join(DickChat, (DickChat.user_id == DickPlayer.user_id) & (DickChat.chat_id == chat_id))
+        q = q.where(_in_chat(chat_id))
     return (await s.execute(q)).scalar() + 1
 
 
@@ -199,8 +205,7 @@ async def board(chat_id: int | None, page: int) -> tuple[list[tuple[int, int, st
             .join(User, User.id == DickPlayer.user_id).where(_visible())
         cnt = select(func.count()).select_from(DickPlayer).join(User, User.id == DickPlayer.user_id).where(_visible())
         if chat_id:
-            on = (DickChat.user_id == DickPlayer.user_id) & (DickChat.chat_id == chat_id)
-            base, cnt = base.join(DickChat, on), cnt.join(DickChat, on)
+            base, cnt = base.where(_in_chat(chat_id)), cnt.where(_in_chat(chat_id))
         total = (await s.execute(cnt)).scalar()
         rows = (await s.execute(base.order_by(DickPlayer.size.desc(), DickPlayer.user_id).limit(PAGE).offset(page * PAGE))).all()
         return [(page * PAGE + i + 1, uid, name, un, size) for i, (uid, name, un, size) in enumerate(rows)], total
@@ -211,6 +216,6 @@ async def my_rank(uid: int, chat_id: int | None) -> tuple[int | None, int | None
         size = (await s.execute(select(DickPlayer.size).where(DickPlayer.user_id == uid))).scalar()
         if size is None:
             return None, None
-        if chat_id and not (await s.execute(select(DickChat.user_id).where(DickChat.chat_id == chat_id, DickChat.user_id == uid))).first():
-            return None, size                       # never played in this group: no rank there
+        if chat_id and not (await s.execute(select(DickPlayer.user_id).where(DickPlayer.user_id == uid, _in_chat(chat_id)))).first():
+            return None, size                       # not known in this group: no rank there
         return await _rank(s, uid, size, chat_id), size

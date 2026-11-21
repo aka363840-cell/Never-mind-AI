@@ -40,7 +40,7 @@ async def growdick_cmd(m: Message, db_user: User):
     else:
         change = f"has not changed, it is still <b>{g.new} cm</b> long !!"
     await m.reply(f"🍆{who} Your dick {change}\n🏆Your position in the top is <b>{g.rank_all}</b> overall.\n\n"
-                  f"Next attempt in <b>{dick.hm(dick.COOLDOWN_S)}</b>.\n\n– /pvp\n– /dicktop")
+                  f"Next attempt in <b>{dick.hm(dick.COOLDOWN_S)}</b>.\n\n– /pvp\n– /dicktop", disable_web_page_preview=True)
 
 
 # ------------------------------------------------------------------------------------------------ /pvp
@@ -63,7 +63,7 @@ async def pvp_cmd(m: Message, command: CommandObject, db_user: User):
     who = link(db_user.id, db_user.first_name, db_user.username)
     vs = "<a href=\"tg://user?id=%d\">you</a>" % target if target else "anyone"
     await m.reply(f"⚔️ {who} bets <b>{bet} cm</b>!\nWho dares to accept? ({vs}) - random winner takes {bet} cm from the loser.\n"
-                  f"<i>Expires in {dur(dick.CHALLENGE_TTL_S)}.</i>", reply_markup=_challenge_kb(cid))
+                  f"<i>Expires in {dur(dick.CHALLENGE_TTL_S)}.</i>", reply_markup=_challenge_kb(cid), disable_web_page_preview=True)
 
 
 async def _names(*uids: int) -> dict[int, tuple[str, str | None]]:
@@ -82,7 +82,13 @@ async def pvp_cb(cb: CallbackQuery, db_user: User):
         await dick.cancel(cid, db_user.id)
         await safe_edit(cb, "✖️ Challenge cancelled.", None)
         return await safe_answer(cb)
-    f = await dick.accept(cid, db_user.id)
+    try:
+        f = await dick.accept(cid, db_user.id)
+    except GameError as e:                      # not eligible (no cm, bet too high, own / someone else's challenge ...): say no, loudly
+        await safe_answer(cb, str(e), alert=True)
+        if cb.message is not None and "already over" not in str(e) and "expired" not in str(e):
+            await cb.message.reply(f"🚫 {link(db_user.id, db_user.first_name, db_user.username)} can't take this fight:\n{e}", disable_web_page_preview=True)
+        return
     nm = await _names(f.winner, f.loser)
     w, l = (link(u, *nm.get(u, ("Player", None))) for u in (f.winner, f.loser))
     await safe_edit(cb, f"⚔️ <b>Dick fight!</b>\n\n🏆 {w} wins and takes <b>{f.bet} cm</b> from {l}!\n\n"
