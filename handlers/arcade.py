@@ -15,6 +15,7 @@ from sqlalchemy import select
 from database.models import User
 from database.session import db
 from game.rules import R
+from handlers import speedgames as speed_h              # ⚡ /tap · 💥 /crash live in their own module; its router is attached below
 from keyboards.menus import back, kb
 from services import arcade, economy
 from services.errors import GameError
@@ -25,6 +26,7 @@ from utils.targets import resolve_target
 from utils.telegram import safe_answer, safe_edit
 
 router = Router()
+router.include_router(speed_h.router)      # ⚡ /tap /jointap · 💥 /crash /joincrash · /end while a speed game runs
 DIV = "┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈"
 
 
@@ -51,12 +53,15 @@ async def hub(uid: int) -> tuple[str, InlineKeyboardMarkup]:
             "✊ /rps <i>[bet]</i> — rock-paper-scissors vs me\n"
             "⭕ /ttt <i>[reply/@user]</i> — tic-tac-toe with a friend (winner takes 25 💎)\n"
             "🔤 /hangman — guess the word, win 💎\n"
+            "⚡ /tap <i>amount</i> — fastest finger wins everybody's entry (group, min. 2 players)\n"
+            "💥 /crash <i>amount</i> — first to count the letters of the secret word wins (group, min. 2 players)\n"
             "🤔 /wyr — would you rather? the group votes live\n"
             "🧩 /riddle · 💡 /fact · 🔮 /horoscope · 🥠 /fortune\n"
             "🌟 /rep <i>(reply)</i> · /toprep — give respect, climb the board\n"
             f"🏦 /interest — daily interest on your bank (from {arcade.INTEREST_MIN_BANK:,} 💎)")
     rows = [[B(text="🎟 Scratch card", callback_data="ar:sc"), B(text="🔤 Hangman", callback_data="ar:hm")],
             [B(text="⭕ Tic-Tac-Toe", callback_data="ar:ttt"), B(text="🤔 Would you rather", callback_data="ar:wy")],
+            [B(text="⚡ Fastest Tap", callback_data="ar:tap"), B(text="💥 Crash Count", callback_data="ar:cr")],
             [B(text="🧩 Riddle", callback_data="ar:rd"), B(text="💡 Fun fact", callback_data="ar:fc")],
             [B(text="🔮 Horoscope", callback_data="ar:ho"), B(text="🥠 Fortune", callback_data="ar:fo")],
             [B(text="🏦 Bank interest", callback_data="ar:in"), B(text="🌟 Top reputation", callback_data="ar:tr")],
@@ -75,7 +80,8 @@ async def arcade_nav(cb: CallbackQuery, db_user: User):
     what = cb.data.split(":")[1]
     msg = cb.message
     table = {"sc": do_scratch, "hm": do_hangman, "ttt": do_ttt, "wy": do_wyr, "rd": do_riddle, "fc": do_fact,
-             "ho": do_horoscope, "fo": do_fortune, "in": do_interest, "tr": do_toprep}
+             "ho": do_horoscope, "fo": do_fortune, "in": do_interest, "tr": do_toprep,
+             "tap": speed_h.do_tap_info, "cr": speed_h.do_crash_info}
     fn = table.get(what)
     if fn is None:
         raise GameError("❌ Unknown button.")

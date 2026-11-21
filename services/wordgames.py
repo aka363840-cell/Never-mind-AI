@@ -107,6 +107,9 @@ def running(chat_id: int) -> str | None:
         return "wordly"
     if chat_id in HACK:
         return "hack"
+    from services import jumble as _jumble                   # Jumble add-on
+    if chat_id in _jumble.GAMES:
+        return "jumble"
     return None
 
 
