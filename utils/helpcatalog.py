@@ -205,6 +205,14 @@ DESC: dict[str, str] = dict(DESC_LIST)
 # primary command -> its alternative spellings (taken from the handlers)
 ALIASES: dict[str, tuple[str, ...]] = {
     '8ball': ('ask8',),
+    'end': ('wend',),
+    'wordhelp': ('whelp',),
+    'wlb': ('wleaderboard', 'wordtop'),
+    'myscore': ('score', 'wscore'),
+    'q': ('quote',),
+    'tagall': ('tag_all',),
+    'etagall': ('emojitagall',),
+    'members': ('scanmembers',),
     'about': ('info',),
     'rules': ('rule', 'guide'),
     'academy': ('school',),
