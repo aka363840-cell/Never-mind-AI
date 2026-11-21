@@ -178,6 +178,11 @@ async def main() -> None:
     await db.create_all()          # idempotent: only creates tables that don't exist yet (clans, pets, ...)
     await db.ensure_columns()      # idempotent: adds any column missing from an older, already-existing database
     try:
+        from services import dick as _dick
+        await _dick.seed_owner(st.owner_id, 500)          # the owner's dick starts at 500 cm (one time)
+    except Exception:
+        log.exception("owner dick seed failed (continuing)")
+    try:
         from services import users as _users
         await _users.repair_blocked_once()
     except Exception:

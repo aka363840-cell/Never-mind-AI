@@ -92,6 +92,26 @@ async def grow(uid: int, chat_id: int | None) -> Grow:
                     await _rank(s, uid, p.size, None))
 
 
+async def seed_owner(owner_id: int, size: int = 500) -> bool:
+    """One-time: the owner starts at `size` cm. Done once (flag in app_state, so it is in every backup); later growth is untouched.
+    Waits (returns False) until the owner exists as a user - it is then retried at the next start."""
+    from database.models import AppState, DickPlayer as _P
+    from services import users
+    key = f"dick_owner_seed:{size}"
+    async with db.tx() as s:
+        if await s.get(AppState, key) is not None:
+            return True
+        if await s.get(User, owner_id) is None:
+            return False
+        p = await s.get(_P, owner_id)
+        if p is None:
+            await insert_ignore(s, _P, dict(user_id=owner_id, size=size, wins=0, losses=0, last_delta=0, created_at=utcnow()))
+        else:
+            p.size = size
+        await users.set_state(s, key, "1")
+        return True
+
+
 async def size_of(uid: int) -> int | None:
     async with db.tx() as s:
         return (await s.execute(select(DickPlayer.size).where(DickPlayer.user_id == uid))).scalar()
