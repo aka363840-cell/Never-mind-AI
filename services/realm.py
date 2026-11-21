@@ -35,16 +35,19 @@ STAT_ACH: dict[str, list[tuple[int, str]]] = {
     "fish": [(50, "angler")],
     "mine": [(50, "prospector")],
     "whale": [(1, "whale")],
+    "tap_win": [(1, "tap_first"), (25, "tap_25")],
+    "crash_win": [(1, "crash_first"), (25, "crash_25")],
 }
 # (stat key, label) shown as progress in /achievements
 STAT_LABELS = {"dungeon_clear": "Dungeon clears", "expedition": "Expeditions", "heist_win": "Heists pulled off",
-               "fish": "Fishing trips", "mine": "Mining trips"}
+               "fish": "Fishing trips", "mine": "Mining trips", "tap_win": "Fastest Tap wins", "crash_win": "Crash Count wins"}
 GROUPS: list[tuple[str, list[str]]] = [
     ("⚔️ Combat & Wealth", ["first_blood", "duelist", "thief", "tycoon", "powered", "collector", "slayer", "mogul"]),
     ("🗺 Realm", ["dungeon_first", "dungeon_10", "dungeon_hard", "explorer", "voyager",
                   "heist_first", "heist_5", "heist_perfect"]),
     ("🏡 Life & Collection", ["pet_owner", "pet_legend", "married", "parent", "landlord", "clanner",
                               "angler", "prospector", "whale"]),
+    ("🕹 Arcade", ["tap_first", "tap_25", "crash_first", "crash_25"]),
     ("⭐ Milestones", ["level_5", "level_10", "level_20", "completionist"]),
 ]
 

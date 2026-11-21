@@ -344,6 +344,11 @@ ACHIEVEMENTS = {
     "angler": ("🎣 Angler", "Go fishing 50 times"),
     "prospector": ("⛏ Prospector", "Go mining 50 times"),
     "whale": ("🐋 Whale Watcher", "Catch the Diamond Whale"),
+    # --- Arcade
+    "tap_first": ("⚡ Quick Draw", "Win a Fastest Tap match"),
+    "tap_25": ("🌩 Lightning Reflexes", "Win 25 Fastest Tap matches"),
+    "crash_first": ("💥 Sharp Eye", "Win a Crash Count match"),
+    "crash_25": ("🧮 Human Calculator", "Win 25 Crash Count matches"),
     # --- Milestones
     "mogul": ("🤑 Mogul", "Hold 100,000 diamonds in total"),
     "level_20": ("🔥 Legend", "Reach level 20"),
