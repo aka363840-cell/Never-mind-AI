@@ -852,3 +852,35 @@ class AcademyHallOfFame(Base):
     detail: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
     __table_args__ = (UniqueConstraint("season_id", "user_id", "title", name="uq_academy_hof"),)
+
+
+class DickPlayer(Base):
+    """🍆 /dick game: one row per player (size in cm, lifetime wins / losses in /pvp)."""
+    __tablename__ = "dick_players"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    size: Mapped[int] = mapped_column(Integer, default=0)
+    wins: Mapped[int] = mapped_column(Integer, default=0)
+    losses: Mapped[int] = mapped_column(Integer, default=0)
+    last_delta: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    __table_args__ = (CheckConstraint("size >= 0", name="ck_dick_size"), Index("ix_dick_size", "size"))
+
+
+class DickChat(Base):
+    """Which group a player has played in (group leaderboard = players with a row for that chat)."""
+    __tablename__ = "dick_chats"
+    chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+
+
+class DickChallenge(Base):
+    """An open /pvp <cm> challenge waiting for somebody to press ⚔️ Accept."""
+    __tablename__ = "dick_challenges"
+    id: Mapped[int] = mapped_column(BigPK, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger)
+    challenger_id: Mapped[int] = mapped_column(BigInteger)
+    target_id: Mapped[int | None] = mapped_column(BigInteger)          # set when the challenge was a reply to somebody
+    bet: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(12), default="open")    # open | done | cancelled | expired
+    created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    __table_args__ = (Index("ix_dick_ch_open", "chat_id", "challenger_id", "status"),)

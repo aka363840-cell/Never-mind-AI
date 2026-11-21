@@ -66,6 +66,13 @@ def _game_info(key: str):
     return show
 
 
+async def _dick_info(msg: Message, user: User, reply: bool = True) -> None:
+    await (msg.reply if reply else msg.answer)(
+        "🍆 <b>Dick game</b>\n/growdick — once every 24 h your dick randomly grows or shrinks (cm)\n"
+        "/pvp <i>cm</i> — bet cm in a group, anyone (or the person you reply to) taps ⚔️ Accept: a random winner takes the cm\n"
+        "/dicktop — this group's board, button for the overall board, names are clickable")
+
+
 # =============================================================== hub
 async def hub(uid: int) -> tuple[str, InlineKeyboardMarkup]:
     """🕹 Games: every group game with its commands; solo / daily extras are one tap away (ar:solo)."""
@@ -81,6 +88,7 @@ async def hub(uid: int) -> tuple[str, InlineKeyboardMarkup]:
             "💥 /crash <i>amount</i> — best-of-3 word-picture count battle (<code>/crash free</code>) · /crashtop\n"
             "⭕ /ttt <i>[reply/@user]</i> — tic-tac-toe with a friend\n"
             "🤔 /wyr — would you rather? the group votes live\n"
+            "🍆 /growdick · /pvp <i>cm</i> · /dicktop — grow daily, fight for cm, group &amp; overall board\n"
             "🛑 /end — end the running game in the chat\n\n"
             "<i>Tap a game for how to play 👇</i>")
     rows = [[B(text="🔎 WordSeek", callback_data="ar:ws"), B(text="🔠 Wordly", callback_data="ar:wl")],
@@ -88,6 +96,7 @@ async def hub(uid: int) -> tuple[str, InlineKeyboardMarkup]:
             [B(text="🐙 Jumble", callback_data="ar:jm"), B(text="🎭 Charades", callback_data="ar:ch")],
             [B(text="⚡ Fastest Tap", callback_data="ar:tap"), B(text="💥 Crash Count", callback_data="ar:cr")],
             [B(text="⭕ Tic-Tac-Toe", callback_data="ar:ttt"), B(text="🤔 Would you rather", callback_data="ar:wy")],
+            [B(text="🍆 Dick game", callback_data="ar:dk")],
             [B(text="🎟 Solo & daily fun ➡️", callback_data="ar:solo")],
             back()]
     return text, kb(rows)
@@ -126,7 +135,7 @@ async def arcade_nav(cb: CallbackQuery, db_user: User):
         text, markup = await (solo if what == "solo" else hub)(db_user.id)
         await safe_answer(cb)
         return await safe_edit(cb, text, markup)
-    table = {"sc": do_scratch, "hm": do_hangman, "ttt": do_ttt, "wy": do_wyr, "rd": do_riddle, "fc": do_fact,
+    table = {"dk": _dick_info, "sc": do_scratch, "hm": do_hangman, "ttt": do_ttt, "wy": do_wyr, "rd": do_riddle, "fc": do_fact,
              "ho": do_horoscope, "fo": do_fortune, "in": do_interest, "tr": do_toprep,
              "tap": speed_h.do_tap_info, "cr": speed_h.do_crash_info,
              **{k: _game_info(k) for k in GAME_INFO}}
