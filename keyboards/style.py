@@ -28,7 +28,7 @@ from sqlalchemy import select
 from keyboards import premium_text
 
 log = logging.getLogger(__name__)
-DEFAULT_PACKS = ("RestrictedEmoji", "sexypiyush69_79e604_by_SexyPiyush_BOT", "FinanceEmoji")   # earlier pack wins on a clash
+DEFAULT_PACKS = ("RestrictedEmoji", "sexypiyush69_79e604_by_SexyPiyush_BOT", "FinanceEmoji", "Udif7rr7_by_fStikBot")   # earlier pack wins on a clash
 ICONS: dict[str, str] = {}          # manual (/seticon): leading emoji of a button text -> custom_emoji_id  (highest priority)
 PACK_ICONS: dict[str, str] = {}     # from the default emoji packs
 _ORDERED: list[tuple[str, str]] = []  # merged (normalised emoji, id), longest emoji first

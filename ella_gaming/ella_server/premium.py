@@ -17,6 +17,8 @@ import time
 import urllib.parse
 import urllib.request
 
+from . import tgstyle
+
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
@@ -507,9 +509,26 @@ async def tg(token, method, **p):
     return await asyncio.to_thread(_tg, token, method, **p)
 
 
+CARD_STYLES = {"🎮": "success", "🔁": "success", "📤": "primary", "👀": "primary"}
+
+
+async def card(token, method, r, **p):
+    """Sends/edits the group card with premium emoji + coloured buttons; falls back to plain if Telegram refuses them."""
+    await tgstyle.load(token, tg)
+    text, mk = lobby_text(r), lobby_markup(r) or {"inline_keyboard": []}
+    try:
+        return await tg(token, method, text=tgstyle.html_text(text), parse_mode="HTML", reply_markup=tgstyle.markup(mk, CARD_STYLES), **p)
+    except Exception as ex:
+        if "not modified" in str(ex).lower():
+            raise
+        tgstyle.refused()
+        log.info("premium: plain card fallback (%s)", ex)
+        return await tg(token, method, text=text, parse_mode="HTML", reply_markup=mk, **p)
+
+
 async def post_msg(r, token):
     try:
-        res = await tg(token, "sendMessage", chat_id=r.chat_id, text=lobby_text(r), parse_mode="HTML", reply_markup=lobby_markup(r) or {"inline_keyboard": []})
+        res = await card(token, "sendMessage", r, chat_id=r.chat_id)
         r.msg_id = res["result"]["message_id"]
         return True
     except Exception:
@@ -524,7 +543,7 @@ async def push_msg(r):
     if not (token and r.msg_id):
         return
     try:
-        await tg(token, "editMessageText", chat_id=r.chat_id, message_id=r.msg_id, text=lobby_text(r), parse_mode="HTML", reply_markup=lobby_markup(r) or {"inline_keyboard": []})
+        await card(token, "editMessageText", r, chat_id=r.chat_id, message_id=r.msg_id)
     except Exception as ex:
         if "not modified" not in str(ex).lower():
             log.warning("premium: lobby edit failed: %s", ex)
