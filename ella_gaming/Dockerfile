@@ -10,9 +10,9 @@ ARG WITH_BROWSER=1
 RUN if [ "$WITH_BROWSER" = "1" ]; then playwright install --with-deps chromium; fi
 COPY ella_server ./ella_server
 COPY web ./web
-RUN useradd -m -u 1000 ella && mkdir -p /data && chown -R ella:ella /data
-USER ella
-VOLUME /data
+# Railway rejects the VOLUME keyword (attach a Railway volume at /data instead) and mounts volumes as root, so the server runs as root;
+# Chromium then needs --no-sandbox (see scanner.py), which is fine inside the container.
+RUN mkdir -p /data
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s CMD python -c "import urllib.request,os;urllib.request.urlopen('http://127.0.0.1:%s/healthz'%os.getenv('PORT','8080'),timeout=4)"
 # ONE worker on purpose: rate limits and the scan state are in memory. It is async and handles many players at once.

@@ -210,7 +210,7 @@ async def scan_browser(urls: dict[str, str], hold_s: float = 5.0, concurrency: i
     out: dict[str, dict] = {}
     sem = asyncio.Semaphore(concurrency)
     async with async_playwright() as pw:
-        browser = await pw.chromium.launch()
+        browser = await pw.chromium.launch(args=["--no-sandbox"] if hasattr(os, "geteuid") and os.geteuid() == 0 else [])
 
         async def one(slug: str, url: str):
             async with sem:
