@@ -92,12 +92,12 @@ function section(title, body, more) {
 }
 
 // ------------------------------------------------------------------ navigation
-const TABS = [["home", "Home"], ["games", "Games"], ["profile", "Profile"]];
+const TABS = [["home", "Home"], ["games", "Games"], ["premium", "Premium"], ["profile", "Profile"]];
 function buildNav() {
   nav.querySelectorAll(".nav-btn").forEach((b) => {
     const [id, label] = TABS.find((t) => t[0] === b.dataset.tab);
     b.replaceChildren(icon(id), h("span", {}, label));
-    b.addEventListener("click", () => { tg.haptic("light"); closeAllLayers(); setTab(id); });
+    b.addEventListener("click", () => { tg.haptic("light"); closeAllLayers(); if (id === "premium") openPremium(PCTX); else setTab(id); });
   });
   nav.hidden = false;
 }

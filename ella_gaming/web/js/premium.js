@@ -20,7 +20,7 @@ export function startParam() {
 
 export function premiumEntry(ctx) {
   return h("button", { class: "pentry", onclick: () => openPremium(ctx) },
-    h("span", { class: "crown" }, "👑"), h("span", {}, h("b", {}, "Premium Games"), h("small", {}, "UNO & LUDO with friends, live")), h("span", { class: "tag" }, "NEW"));
+    h("span", { class: "crown" }, "👑"), h("span", {}, h("b", {}, "Premium Games"), h("small", {}, "UNO, Ludo & Chess with friends")), h("span", { class: "tag" }, "NEW"));
 }
 
 // ------------------------------------------------------------------ cards

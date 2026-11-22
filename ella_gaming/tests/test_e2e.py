@@ -109,9 +109,9 @@ def test_home_and_navigation(browser, stack):
         expect(page.locator(".sec-head h2", has_text=title).first).to_be_visible()
     expect(page.locator(".card.feat").first).to_be_visible()
     expect(page.locator(".search input")).to_be_visible()
-    # bottom navigation: exactly Home / Games / Profile
+    # bottom navigation: exactly Home / Games / Premium / Profile
     btns = page.locator("#nav .nav-btn")
-    assert btns.count() == 3 and [t.strip() for t in btns.all_inner_texts()] == ["Home", "Games", "Profile"]
+    assert btns.count() == 4 and [t.strip() for t in btns.all_inner_texts()] == ["Home", "Games", "Premium", "Profile"]
     body = page.locator("body").inner_text().lower()
     assert "leaderboard" not in body and "stats" not in body
     assert page.evaluate("window.__ready && window.__expanded")
