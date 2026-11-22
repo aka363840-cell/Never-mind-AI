@@ -34,5 +34,6 @@ export const tg = {
   exitFullscreen() { try { if (W && W.isFullscreen) W.exitFullscreen(); } catch {} },
   onFullscreenChange(fn) { try { if (W && ver("8.0")) { W.onEvent("fullscreenChanged", fn); W.onEvent("fullscreenFailed", fn); } } catch {} },
   haptic(kind = "light") { try { if (ver("6.1")) W.HapticFeedback.impactOccurred(kind); } catch {} },
+  notify(kind = "success") { try { if (ver("6.1")) W.HapticFeedback.notificationOccurred(kind); } catch {} },
   close() { try { W.close(); } catch {} },
 };

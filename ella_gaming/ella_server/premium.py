@@ -17,7 +17,7 @@ import time
 import urllib.parse
 import urllib.request
 
-from . import tgstyle
+from . import premium_ai, tgstyle
 
 from starlette.responses import JSONResponse
 from starlette.routing import Route
@@ -30,6 +30,12 @@ ROOMS: dict[str, "Room"] = {}
 BOT_NAME: list[str] = []
 
 
+# Rules the host can change in the lobby: key -> allowed values (the first one is the default)
+OPT_DEFS = {"stack": [True, False], "block": [True, False], "callout": [True, False], "seven": [False, True], "jump": [False, True],
+            "pts": [0, 100, 200, 500], "team": [False, True], "tc": ["off", "1+0", "3+2", "5+0", "10+0"], "lvl": ["normal", "easy"]}
+BOTS = ["Ruby", "Nova", "Pixel", "Echo", "Zed"]
+
+
 class Err(Exception):
     pass
 
@@ -39,7 +45,8 @@ class Room:
         self.code = "".join(secrets.choice(ALPHA) for _ in range(5))
         self.game, self.players, self.status, self.g, self.winner = game, [host], "lobby", None, None
         self.v, self.ev, self.t = 1, asyncio.Event(), time.time()
-        self.opts = {"stack": True, "block": True}
+        self.opts = {k: v[0] for k, v in OPT_DEFS.items()}
+        self.match, self.bt = {}, None
         self.chat_id = self.msg_id = self.title = self.link = None
         self.sync = None
 
@@ -47,29 +54,39 @@ class Room:
     def ids(self):
         return [p["id"] for p in self.players]
 
+    def host(self):
+        return next((i for i in self.ids if i >= 0), self.ids[0])
+
     def name(self, uid):
         return next((p["name"] for p in self.players if p["id"] == uid), "Player")
 
 
 # ------------------------------------------------------------------------------------------------ UNO
+CARD_PTS = lambda c: 50 if c[0] == "w" else 20 if c[1:] in ("s", "r", "d") else int(c[1:])
+
+
 def uno_start(r):
     deck = [c + v for c in "rygb" for v in ["0"] + [x for x in "123456789sdr" for _ in (0, 1)]] + ["w"] * 4 + ["w4"] * 4
     random.shuffle(deck)
-    g = {"hands": {i: [deck.pop() for _ in range(7)] for i in r.ids}, "deck": deck, "dir": 1, "turn": 0, "drawn": None, "pend": 0, "pk": ""}
+    n = len(r.ids)
+    r.match.setdefault("score", {})
+    r.match["round"] = r.match.get("round", 0) + 1
+    first = (r.match["round"] - 1) % n
+    g = {"hands": {i: [deck.pop() for _ in range(7)] for i in r.ids}, "deck": deck, "dir": 1, "turn": first, "drawn": None, "pend": 0, "pk": "",
+         "vuln": None, "rdone": None, "last": ""}
     while deck[-1][0] == "w":
         random.shuffle(deck)
     top = deck.pop()
     g.update(top=top, color=top[0], tv=top[1:], pile=[top])
     r.g = g
-    n = len(r.ids)
     if top[1:] == "s":
-        g["turn"] = 1 % n
+        g["turn"] = (first + 1) % n
     elif top[1:] == "r":
         g["dir"] = -1
-        g["turn"] = (n - 1) if n > 2 else 1 % n
+        g["turn"] = (first - 1) % n if n > 2 else (first + 1) % n
     elif top[1:] == "d":
-        uno_draw(g, r.ids[0], 2)
-        g["turn"] = 1 % n
+        uno_draw(g, r.ids[first], 2)
+        g["turn"] = (first + 1) % n
 
 
 def uno_draw(g, pid, k):
@@ -88,15 +105,58 @@ def uno_can(g, c):
     return c[0] == "w" or c[0] == g["color"] or (g["tv"] != "" and c[1:] == g["tv"])
 
 
+def uno_jump(r, g, c):
+    """Jump-in: the exact same card (colour + value) as the top card may be played out of turn."""
+    return bool(r.opts.get("jump")) and c == g["top"] and c[0] != "w" and not g["pend"] and not g["drawn"]
+
+
 def uno_adv(r, k=1):
     g = r.g
     g["turn"] = (g["turn"] + g["dir"] * k) % len(r.ids)
 
 
+def uno_end(r, uid):
+    """Someone emptied their hand. Single round -> game over; otherwise points, next round or match winner."""
+    g, target = r.g, int(r.opts.get("pts") or 0)
+    if not target:
+        return finish(r, uid)
+    pts = sum(CARD_PTS(c) for i, h in g["hands"].items() if i != uid for c in h)
+    sc = r.match["score"]
+    sc[uid] = sc.get(uid, 0) + pts
+    g["rdone"] = {"w": uid, "pts": pts}
+    g["last"] = f"{r.name(uid)} won the round (+{pts})"
+    if sc[uid] >= target:
+        g["res"] = f"Reached {target} points"
+        finish(r, uid)
+
+
 def uno_act(r, uid, a, d):
     g, ids = r.g, r.ids
-    if ids[g["turn"]] != uid:
-        raise Err("It's not your turn.")
+    if g.get("rdone"):
+        if a == "next" and r.status == "playing":
+            return uno_start(r)
+        raise Err("Round finished - start the next one.")
+    if a == "uno":                                      # call UNO on your last card (any time while you are exposed)
+        if g["vuln"] != uid:
+            raise Err("Nothing to call.")
+        g["vuln"], g["last"] = None, f"{r.name(uid)}: UNO!"
+        return
+    if a == "catch":                                    # catch a rival who forgot to call UNO
+        v = g["vuln"]
+        if v is None or v == uid:
+            raise Err("Nobody to catch.")
+        uno_draw(g, v, 2)
+        g["vuln"], g["last"] = None, f"{r.name(uid)} caught {r.name(v)} - +2 cards!"
+        return
+    me_turn = ids[g["turn"]] == uid
+    if not me_turn:
+        c = str(d.get("card", ""))
+        if not (a == "play" and c in g["hands"].get(uid, []) and uno_jump(r, g, c)):
+            raise Err("It's not your turn.")
+        g["turn"] = ids.index(uid)                      # jump-in: the turn moves to you
+        g["last"] = f"{r.name(uid)} jumped in!"
+    if g["vuln"] is not None and g["vuln"] != uid:
+        g["vuln"] = None                                # the chance to catch is over once someone else moves
     hand, n = g["hands"][uid], len(ids)
     if a == "draw":
         if g["drawn"]:
@@ -122,16 +182,32 @@ def uno_act(r, uid, a, d):
             raise Err("That card isn't in your hand.")
         if g["drawn"] and g["drawn"] != c:
             raise Err("Play the card you drew, or pass.")
-        if not uno_can(g, c):
+        if not (uno_can(g, c) or (not me_turn)):
             raise Err("That card can't be played now.")
         if c[0] == "w" and col not in list("rygb"):
             raise Err("Pick a colour.")
+        seven, to = r.opts["seven"] and c[1:] == "7", d.get("to")
+        if seven and len(hand) > 1 and (to not in ids or to == uid):
+            raise Err("Pick a player to swap hands with.")
         hand.remove(c)
         g["pile"].append(c)
-        g.update(top=c, tv="" if c[0] == "w" else c[1:], color=col if c[0] == "w" else c[0], drawn=None)
+        g.update(top=c, tv="" if c[0] == "w" else c[1:], color=col if c[0] == "w" else c[0], drawn=None, last=g["last"] if not me_turn else "")
         if not hand:
-            return finish(r, uid)
+            return uno_end(r, uid)
+        if r.opts["callout"] and len(hand) == 1 and uid >= 0:
+            g["vuln"] = uid                             # must press UNO before somebody catches you
         nxt = ids[(g["turn"] + g["dir"]) % n]
+        if seven:
+            g["hands"][uid], g["hands"][to] = g["hands"][to], g["hands"][uid]
+            g["last"] = f"{r.name(uid)} swapped hands with {r.name(to)}"
+            if not g["hands"][uid]:
+                return uno_end(r, uid)
+        if r.opts["seven"] and c[1:] == "0" and n > 1:
+            hs = [g["hands"][i] for i in ids]
+            hs = hs[-g["dir"]:] + hs[:-g["dir"]] if g["dir"] == 1 else hs[1:] + hs[:1]
+            for i, h in zip(ids, hs):
+                g["hands"][i] = h
+            g["last"] = "Everyone passed their hand along!"
         if c[1:] == "r":
             g["dir"] *= -1
             uno_adv(r, 2 if n == 2 else 1)
@@ -154,10 +230,13 @@ def uno_act(r, uid, a, d):
 
 
 def uno_view(r, uid):
-    g = r.g
-    return {"hand": g["hands"].get(uid, []), "counts": {i: len(h) for i, h in g["hands"].items()}, "top": g["top"], "color": g["color"],
+    g, mine = r.g, r.ids[r.g["turn"]] == uid
+    hand = g["hands"].get(uid, [])
+    pl = [c for c in hand if uno_can(g, c) and (not g["drawn"] or c == g["drawn"])] if mine else [c for c in hand if uno_jump(r, g, c)]
+    return {"hand": hand, "counts": {i: len(h) for i, h in g["hands"].items()}, "top": g["top"], "color": g["color"],
             "turn": r.ids[g["turn"]], "dir": g["dir"], "deck": len(g["deck"]), "drawn": g["drawn"], "pend": g.get("pend", 0),
-            "playable": [c for c in g["hands"].get(uid, []) if uno_can(g, c) and (not g["drawn"] or c == g["drawn"])]}
+            "playable": pl, "vuln": g["vuln"], "last": g["last"], "rdone": g["rdone"], "score": r.match.get("score", {}), "round": r.match.get("round", 1),
+            "target": int(r.opts.get("pts") or 0)}
 
 
 # ------------------------------------------------------------------------------------------------ LUDO
@@ -166,7 +245,13 @@ OFF, SAFE = (0, 13, 26, 39), {0, 8, 13, 21, 26, 34, 39, 47}
 
 def ludo_start(r):
     seats = {2: [0, 2], 3: [0, 1, 2], 4: [0, 1, 2, 3]}[len(r.ids)]
-    r.g = {"seat": dict(zip(r.ids, seats)), "tok": {i: [-1] * 4 for i in r.ids}, "turn": 0, "roll": None, "sixes": 0, "last": "", "block": r.opts["block"]}
+    r.g = {"seat": dict(zip(r.ids, seats)), "tok": {i: [-1] * 4 for i in r.ids}, "turn": 0, "roll": None, "sixes": 0, "last": "", "block": r.opts["block"],
+           "team": bool(r.opts["team"]) and len(r.ids) == 4, "extra": "", "wt": None, "rv": 0}
+
+
+def ludo_mates(g, a, b):
+    """Teammates (team mode: seats 0+2 against 1+3) never capture or block each other."""
+    return g.get("team") and g["seat"][a] % 2 == g["seat"][b] % 2
 
 
 def ludo_blocked(g, uid, p, new):
@@ -175,7 +260,7 @@ def ludo_blocked(g, uid, p, new):
     for q in ([0] if p < 0 else range(p + 1, min(new, 50) + 1)):
         a = (OFF[seat] + q) % 52
         for oid, ot in g["tok"].items():
-            if oid != uid and sum(1 for x in ot if 0 <= x <= 50 and (OFF[g["seat"][oid]] + x) % 52 == a) >= 2:
+            if oid != uid and not ludo_mates(g, uid, oid) and sum(1 for x in ot if 0 <= x <= 50 and (OFF[g["seat"][oid]] + x) % 52 == a) >= 2:
                 return True
     return False
 
@@ -187,9 +272,18 @@ def ludo_moves(g, uid, block=None):
     return [i for i in out if not (block and ludo_blocked(g, uid, g["tok"][uid][i], 0 if g["tok"][uid][i] < 0 else g["tok"][uid][i] + roll))]
 
 
+def ludo_done(g, uid):
+    return all(t == 56 for t in g["tok"][uid])
+
+
 def ludo_next(r):
     g = r.g
-    g.update(turn=(g["turn"] + 1) % len(r.ids), roll=None, sixes=0)
+    g.update(turn=(g["turn"] + 1) % len(r.ids), roll=None, sixes=0, extra="")
+    for _ in range(len(r.ids)):                         # team mode: a finished player just waits for the partner
+        if g["team"] and ludo_done(g, r.ids[g["turn"]]):
+            g["turn"] = (g["turn"] + 1) % len(r.ids)
+        else:
+            break
 
 
 def ludo_act(r, uid, a, d):
@@ -201,12 +295,16 @@ def ludo_act(r, uid, a, d):
             raise Err("Move a token first.")
         g["roll"] = random.randint(1, 6)
         g["sixes"] = g["sixes"] + 1 if g["roll"] == 6 else 0
+        g["extra"], g["rv"] = "", g["roll"]
         g["last"] = f"{r.name(uid)} rolled {g['roll']}"
         if g["sixes"] >= 3:
             g["last"] += " - third six, turn lost"
             ludo_next(r)
         elif not ludo_moves(g, uid):
-            ludo_next(r) if g["roll"] != 6 else g.update(roll=None)
+            if g["roll"] != 6:
+                ludo_next(r)
+            else:
+                g.update(roll=None, extra="six")
     elif a == "move":
         i = d.get("token")
         if not g["roll"] or i not in ludo_moves(g, uid):
@@ -218,14 +316,17 @@ def ludo_act(r, uid, a, d):
         if a_pos is not None and a_pos not in SAFE:
             for oid, ot in g["tok"].items():
                 for j, q in enumerate(ot):
-                    if oid != uid and 0 <= q <= 50 and (OFF[g["seat"][oid]] + q) % 52 == a_pos:
+                    if oid != uid and not ludo_mates(g, uid, oid) and 0 <= q <= 50 and (OFF[g["seat"][oid]] + q) % 52 == a_pos:
                         ot[j], hit = -1, True
-        if all(t == 56 for t in toks):
+        if ludo_done(g, uid) and (not g["team"] or all(ludo_done(g, o) for o in g["tok"] if ludo_mates(g, uid, o))):
+            g["wt"] = seat % 2
+            if g["team"]:
+                g["res"] = "Team win"
             return finish(r, uid)
         if hit:
             g["last"] = f"{r.name(uid)} captured a token!"
         if roll == 6 or hit or new == 56:
-            g["roll"] = None
+            g["roll"], g["extra"] = None, "six" if roll == 6 else "capture" if hit else "home"
         else:
             ludo_next(r)
     else:
@@ -234,9 +335,8 @@ def ludo_act(r, uid, a, d):
 
 def ludo_view(r, uid):
     g = r.g
-    return {"tok": g["tok"], "seat": g["seat"], "turn": r.ids[g["turn"]], "roll": g["roll"], "last": g["last"],
+    return {"tok": g["tok"], "seat": g["seat"], "turn": r.ids[g["turn"]], "roll": g["roll"], "last": g["last"], "extra": g["extra"], "rv": g["rv"], "team": g["team"], "wt": g["wt"],
             "block": g["block"], "movable": ludo_moves(g, uid) if r.ids[g["turn"]] == uid else []}
-
 
 
 # ------------------------------------------------------------------------------------------------ CHESS (full rules, server-authoritative)
@@ -355,25 +455,94 @@ def c_end(g):
         return None, "Insufficient material"
 
 
+def tc_parse(tc):
+    """'3+2' -> (180 seconds, 2 seconds increment); 'off' -> None."""
+    if tc == "off" or "+" not in str(tc):
+        return None
+    m, i = str(tc).split("+")
+    return int(m) * 60, int(i)
+
+
 def chess_start(r):
     b = [list("rnbqkbnr"), list("pppppppp")] + [list("." * 8) for _ in range(4)] + [list("PPPPPPPP"), list("RNBQKBNR")]
     w = random.choice(r.ids)
-    r.g = {"b": b, "stm": True, "cr": "KQkq", "ep": None, "half": 0, "full": 1, "w": w, "turn": r.ids.index(w), "last": None, "res": "", "rep": {}}
+    tc = tc_parse(r.opts["tc"])
+    r.g = {"b": b, "stm": True, "cr": "KQkq", "ep": None, "half": 0, "full": 1, "w": w, "turn": r.ids.index(w), "last": None, "res": "", "rep": {},
+           "mv": [], "hist": [], "draw": None, "undo": None, "tc": tc, "inc": tc[1] if tc else 0, "clk": {i: tc[0] for i in r.ids} if tc else {}, "ts": time.time()}
+
+
+def c_san(g, m, promo, legal):
+    r, c, r2, c2 = m
+    b, p = g["b"], g["b"][r][c]
+    u, f = p.upper(), "abcdefgh"
+    sq, cap = f[c2] + str(8 - r2), b[r2][c2] != "." or (u == "P" and c != c2)
+    if u == "K" and abs(c2 - c) == 2:
+        return "O-O" if c2 > c else "O-O-O"
+    if u == "P":
+        return (f[c] + "x" if cap else "") + sq + ("=" + promo if r2 in (0, 7) else "")
+    amb = [x for x in legal if x != m and b[x[0]][x[1]] == p and x[2] == r2 and x[3] == c2]
+    dis = ""
+    if amb:
+        dis = f[c] if all(x[1] != c for x in amb) else str(8 - r) if all(x[0] != r for x in amb) else f[c] + str(8 - r)
+    return u + dis + ("x" if cap else "") + sq
+
+
+def chess_snap(g):
+    return {"b": [row[:] for row in g["b"]], "stm": g["stm"], "cr": g["cr"], "ep": g["ep"], "half": g["half"], "full": g["full"], "turn": g["turn"],
+            "last": g["last"], "rep": dict(g["rep"]), "clk": dict(g["clk"])}
+
+
+def chess_draw_end(r, why):
+    r.g["res"] = why
+    r.status, r.winner = "done", None
 
 
 def chess_act(r, uid, a, d):
     g = r.g
+    opp = next(i for i in r.ids if i != uid)
     if a == "resign":
         g["res"] = "Resignation"
-        return finish(r, next(i for i in r.ids if i != uid))
+        return finish(r, opp)
+    if a == "draw":                                     # offer a draw, or accept the one on the table
+        if g["draw"] == opp:
+            return chess_draw_end(r, "Draw agreed")
+        g["draw"] = uid
+        if opp < 0 and premium_ai.chess_accepts_draw(g, opp == g["w"]):
+            return chess_draw_end(r, "Draw agreed")
+        return
+    if a == "draw_no":
+        g["draw"] = None
+        return
+    if a == "undo":                                     # ask to take back your last move, or accept the request
+        if g["undo"] == opp or opp < 0:
+            return chess_undo(r, uid)
+        if not g["hist"]:
+            raise Err("Nothing to take back yet.")
+        g["undo"] = uid
+        return
+    if a == "undo_no":
+        g["undo"] = None
+        return
     if r.ids[g["turn"]] != uid:
         raise Err("It's not your turn.")
     m = d.get("m")
-    if a != "move" or not (isinstance(m, list) and len(m) == 4 and all(isinstance(x, int) for x in m)) or tuple(m) not in c_legal(g):
+    if a != "move" or not (isinstance(m, list) and len(m) == 4 and all(isinstance(x, int) for x in m)):
+        raise Err("Illegal move.")
+    legal = c_legal(g)
+    if tuple(m) not in legal:
         raise Err("Illegal move.")
     promo = str(d.get("promo", "Q")).upper()
-    g.update(c_next(g, tuple(m), promo if promo in ("Q", "R", "B", "N") else "Q"))
-    g["turn"], g["last"] = (g["turn"] + 1) % 2, m
+    promo = promo if promo in ("Q", "R", "B", "N") else "Q"
+    now = time.time()
+    if g["tc"]:
+        g["clk"][uid] = g["clk"][uid] - (now - g["ts"]) + g["inc"]
+    snap, san = chess_snap(g), c_san(g, tuple(m), promo, legal)
+    g["hist"].append(snap)
+    g.update(c_next(g, tuple(m), promo))
+    g["turn"], g["last"], g["ts"], g["draw"], g["undo"] = (g["turn"] + 1) % 2, m, now, None, None
+    chk = c_check(g)
+    mate = chk and not c_legal(g)
+    g["mv"].append(san + ("#" if mate else "+" if chk else ""))
     key = ("".join("".join(x) for x in g["b"]), g["stm"], g["cr"], g["ep"])
     g["rep"][key] = g["rep"].get(key, 0) + 1
     end = (None, "Threefold repetition") if g["rep"][key] >= 3 else c_end(g)
@@ -382,10 +551,32 @@ def chess_act(r, uid, a, d):
         r.status, r.winner = "done", (None if end[0] is None else (g["w"] if end[0] else next(i for i in r.ids if i != g["w"])))
 
 
+def chess_undo(r, uid):
+    g = r.g
+    k = 2 if r.ids[g["turn"]] == uid else 1               # you moved last -> 1 move back, otherwise take back the rival's reply too
+    if len(g["hist"]) < k:
+        raise Err("Nothing to take back yet.")
+    snap = None
+    for _ in range(k):
+        snap = g["hist"].pop()
+        g["mv"].pop()
+    g.update({x: snap[x] for x in snap})
+    g["ts"], g["draw"], g["undo"] = time.time(), None, None
+
+
 def chess_view(r, uid):
     g = r.g
-    return {"b": ["".join(x) for x in g["b"]], "turn": r.ids[g["turn"]], "w": g["w"], "last": g["last"], "res": g["res"], "check": c_check(g) if r.status == "playing" else False,
-            "legal": [list(m) for m in c_legal(g)] if r.status == "playing" and r.ids[g["turn"]] == uid else []}
+    full = {"p": 8, "n": 2, "b": 2, "r": 2, "q": 1}
+    have = {}
+    for row in g["b"]:
+        for p in row:
+            have[p] = have.get(p, 0) + 1
+    lost = lambda white: "".join(k * max(0, n - have.get(k.upper() if white else k, 0)) for k, n in full.items())
+    mover = r.ids[g["turn"]]
+    return {"b": ["".join(x) for x in g["b"]], "turn": mover, "w": g["w"], "last": g["last"], "res": g["res"], "check": c_check(g) if r.status == "playing" else False,
+            "legal": [list(m) for m in c_legal(g)] if r.status == "playing" and mover == uid else [], "mv": g["mv"], "lost": {"w": lost(True), "b": lost(False)},
+            "draw": g["draw"], "undo": g["undo"], "clk": {i: max(0, int(c)) for i, c in g["clk"].items()}, "ts": int(g["ts"]), "tc": bool(g["tc"]),
+            "can_undo": bool(g["hist"]), "rem": max(0, int(g["clk"][mover] - (time.time() - g["ts"]))) if g["tc"] else 0}
 
 
 START = {"uno": uno_start, "ludo": ludo_start, "chess": chess_start}
@@ -399,27 +590,73 @@ def finish(r, uid):
 
 def view(r, uid):
     g = r.g and VIEW[r.game](r, uid)
-    return {"v": r.v, "code": r.code, "game": r.game, "status": r.status, "host": r.ids[0], "players": r.players, "me": uid,
+    return {"v": r.v, "code": r.code, "game": r.game, "status": r.status, "host": r.host(), "players": r.players, "me": uid,
             "min": GAMES[r.game][0], "max": GAMES[r.game][1], "winner": r.winner, "link": invite_link(r), "g": g,
             "deadline": int(r.g["dl"]) if r.g and r.status == "playing" else 0, "group": r.title, "opts": r.opts}
+
+
+def actor(r):
+    g = r.g
+    return None if not g or r.status != "playing" or g.get("rdone") else r.ids[g["turn"]]
 
 
 def bump(r):
     r.v += 1
     r.t = time.time()
     if r.status == "playing" and r.g:
-        r.g["dl"] = time.time() + (150 if r.game == "chess" else TURN_S)
+        g = r.g
+        if r.game == "chess" and g["tc"]:
+            g["dl"] = g["ts"] + g["clk"][r.ids[g["turn"]]]
+        else:
+            g["dl"] = time.time() + (150 if r.game == "chess" else 20 if g.get("rdone") else TURN_S)
     ev, r.ev = r.ev, asyncio.Event()
     ev.set()
     if r.chat_id and not r.sync:
         r.sync = asyncio.create_task(push_msg(r))
+    if (actor(r) or 0) < 0 and not r.bt:
+        r.bt = asyncio.create_task(bot_run(r))
+
+
+async def bot_run(r):
+    """Computer players: wait a moment (so people can follow), then play one step at a time until a human is up."""
+    try:
+        while True:
+            uid = actor(r)
+            if uid is None or uid >= 0:
+                return
+            await asyncio.sleep(random.uniform(0.9, 1.7))
+            if actor(r) != uid:
+                continue
+            a, d = await asyncio.to_thread(premium_ai.plan, r, uid)
+            try:
+                ACT[r.game](r, uid, a, d)
+            except Err as e:
+                log.warning("premium bot move refused: %s", e)
+                if r.game == "uno":                     # never get stuck: fall back to a plain draw/pass
+                    try:
+                        ACT["uno"](r, uid, "pass" if r.g["drawn"] else "draw", {})
+                    except Err:
+                        return
+                else:
+                    return
+            bump(r)
+    except Exception:
+        log.exception("premium bot crashed")
+    finally:
+        r.bt = None
 
 
 def tick(r):
-    """A player who stays idle for TURN_S seconds is auto-played so the table never freezes."""
+    """A player who stays idle is auto-played so the table never freezes (chess: the clock runs out)."""
     if r.status != "playing" or time.time() < r.g.get("dl", 1e18):
         return
+    if r.g.get("rdone"):
+        if r.game == "uno":
+            uno_start(r)
+        return bump(r)
     uid = r.ids[r.g["turn"]]
+    if uid < 0:
+        return
     try:
         if r.game == "chess":                              # chess: running out of time loses the game
             r.g["res"] = "Timeout"
@@ -442,17 +679,23 @@ def tick(r):
 def drop(r, uid):
     i = r.ids.index(uid)
     r.players.pop(i)
+    if not any(x >= 0 for x in r.ids):
+        return
     if r.status == "playing":
         g = r.g
         g.get("hands" if r.game == "uno" else "tok", {}).pop(uid, None)
-        if len(r.players) < 2:
+        if len(r.players) < 2 or (r.game == "chess"):
             g["res"] = "Opponent left"
-            return finish(r, r.ids[0])
+            return finish(r, next((x for x in r.ids if x >= 0), r.ids[0]))
         if i < g["turn"]:
             g["turn"] -= 1
         g["turn"] %= len(r.players)
         g["drawn"] = g.get("drawn") and None
         g["roll"] = g.get("roll") and None
+        if g.get("vuln") == uid:
+            g["vuln"] = None
+        if r.game == "ludo" and g.get("team"):
+            g["team"] = False
 
 
 def purge():
@@ -476,7 +719,7 @@ def lobby_text(r):
         st = f"🟢 <b>Game in progress</b>\n🎯 Turn: <b>{e(r.name(r.ids[r.g['turn']]))}</b>"
     else:
         st = "🤝 <b>Draw</b>" if r.winner is None else f"🏆 <b>{e(r.name(r.winner))}</b> won the table!"
-    rows = "\n".join(("👑 " if i == 0 else "👤 ") + e(p["name"]) for i, p in enumerate(r.players))
+    rows = "\n".join(("👑 " if p["id"] == r.host() else "🤖 " if p["id"] < 0 else "👤 ") + e(p["name"]) for p in r.players)
     return f"{ico} <b>{title} · Premium</b>  <code>{r.code}</code>\n\n{st}\n\n{rows}"
 
 
@@ -576,7 +819,7 @@ def build_routes(m):
         if game not in GAMES:
             raise ApiError(400, "bad_game")
         purge()
-        if sum(1 for r in ROOMS.values() if r.ids[0] == me["id"] and r.status != "done") >= 3:
+        if sum(1 for r in ROOMS.values() if r.host() == me["id"] and r.status != "done") >= 3:
             raise ApiError(409, "too_many", "You already host 3 open tables.")
         r = Room(game, me)
         ROOMS[r.code] = r
@@ -620,24 +863,39 @@ def build_routes(m):
                 raise Err("Join the table first.")
             elif a == "leave":
                 drop(r, uid)
-                if not r.players:
+                if not any(i >= 0 for i in r.ids):
                     ROOMS.pop(r.code, None)
                     return JSONResponse({"left": True})
             elif a == "opt":
-                if uid != r.ids[0] or r.status != "lobby":
+                if uid != r.host() or r.status != "lobby":
                     raise Err("Only the host can change rules before the game starts.")
-                if d.get("k") in r.opts:
-                    r.opts[d["k"]] = bool(d.get("v"))
+                if d.get("k") in OPT_DEFS and d.get("v") in OPT_DEFS[d["k"]]:
+                    r.opts[d["k"]] = d["v"]
+            elif a in ("addbot", "rmbot"):
+                if uid != r.host() or r.status != "lobby":
+                    raise Err("Only the host can change the seats before the game starts.")
+                if a == "addbot":
+                    if len(r.players) >= GAMES[r.game][1]:
+                        raise Err("This table is full.")
+                    n = sum(1 for i in r.ids if i < 0) + 1
+                    used = {p["name"] for p in r.players}
+                    nm = next((f"🤖 {b}" for b in BOTS if f"🤖 {b}" not in used), f"🤖 Bot {n}")
+                    r.players.append({"id": -n, "name": nm, "photo": "", "bot": True})
+                else:
+                    bots = [p for p in r.players if p["id"] < 0]
+                    if not bots:
+                        raise Err("No computer players to remove.")
+                    r.players.remove(bots[-1])
             elif a in ("start", "again"):
-                if uid != r.ids[0]:
+                if uid != r.host():
                     raise Err("Only the host can do that.")
                 if a == "start" and r.status == "lobby":
                     if len(r.players) < GAMES[r.game][0]:
                         raise Err(f"Need at least {GAMES[r.game][0]} players.")
-                    r.status = "playing"
+                    r.status, r.match = "playing", {}
                     START[r.game](r)
                 elif a == "again" and r.status == "done":
-                    r.status, r.g, r.winner = "lobby", None, None
+                    r.status, r.g, r.winner, r.match = "lobby", None, None, {}
                 else:
                     raise Err("Nothing to do.")
             elif r.status != "playing":

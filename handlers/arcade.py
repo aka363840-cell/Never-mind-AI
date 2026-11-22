@@ -57,7 +57,7 @@ GAME_INFO = {
           "/jumble or /jum · /jskip · /jlb leaderboard · /jstats · /endgame",
     "ch": "🎭 <b>Charades</b> (groups)\nThe host gets a secret word in DM and describes it with emojis, clues or text - everybody else guesses by typing. After each round a button lets anyone become the next host.\n"
           "/charades or /describe · /endgame",
-    "pg": "👑 <b>Premium Games</b> (UNO · Ludo · Chess)\nTables play inside the Mini App: create one, share the link or 5-letter code, friends join in one tap. In a group the command posts a live card (waiting / whose turn / winner).\n"
+    "pg": "👑 <b>Premium Games</b> (UNO · Ludo · Chess)\nTables play inside the Mini App: create one, share the link or 5-letter code, friends join in one tap, or add computer players. Chess clocks, UNO house rules, Ludo teams. In a group the command posts a live card (waiting / whose turn / winner).\n"
           "/uno 2-6 players · /ludo 2-4 players · /chess 2 players",
 }
 

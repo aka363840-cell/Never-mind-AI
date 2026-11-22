@@ -118,7 +118,7 @@ def test_home_and_navigation(browser, stack):
     tab(page, "games"); expect(page.locator(".grid .card").first).to_be_visible()
     tab(page, "profile"); expect(page.locator(".p-head h1")).to_have_text("Ada")
     tab(page, "home"); expect(page.locator(".greet h1")).to_contain_text("Ada")
-    assert not page.ella_errors, page.ella_errors
+    assert not page.ella_errors, [e[:300] for e in page.ella_errors]
     page.ctx.close()
 
 
@@ -157,7 +157,7 @@ def test_games_catalogue_lazy_loading_search_categories(browser, stack):
     # home category tile -> filtered games
     tab(page, "home"); page.locator(".cat", has_text="Puzzle").click()
     expect(page.locator(".chip[aria-pressed=true]")).to_have_text("Puzzle")
-    assert not page.ella_errors, page.ella_errors
+    assert not page.ella_errors, [e[:300] for e in page.ella_errors]
     page.ctx.close()
 
 
@@ -220,7 +220,7 @@ def test_play_game_touch_controls_no_ads_back_navigation_history(browser, stack)
     expect(page.locator(".sec-head h2", has_text="Continue playing")).to_be_visible()      # survives reload (server-side)
     expect(page.locator(".sec-head h2", has_text="Favourites")).to_be_visible()
     expect(page.locator(".empty-card")).to_have_count(0)
-    assert not page.ella_errors, page.ella_errors
+    assert not page.ella_errors, [e[:300] for e in page.ella_errors]
     page.ctx.close()
 
 
@@ -336,3 +336,92 @@ def test_screenshots_for_report(browser, stack):
     page.locator(".player .back").click(); tab(page, "profile"); page.wait_for_timeout(600)
     page.screenshot(path=f"{out}/profile.png")
     page.ctx.close()
+
+
+def test_premium_vs_computer(browser, stack):
+    """Premium Games: add a computer player, start each game, play a move, the computer answers; no JS errors."""
+    ella, _ = stack
+    page = new_page(browser, ella)
+    page.goto(ella.url)
+    tab(page, "premium")
+    shots = os.environ.get("PG_SHOTS")
+
+    def snap(name):
+        if shots:
+            page.screenshot(path=f"{shots}/{name}.png")
+
+    def table(game):
+        page.locator(f".tile.{game} .go").click()
+        expect(page.locator(".code")).to_be_visible()
+        page.get_by_text("🤖 Add computer").click()
+        expect(page.locator(".seat .avatar.bot")).to_be_visible()
+
+    # --- chess with a 3+2 clock
+    table("chess")
+    page.get_by_role("button", name="3+2").click()
+    snap("chess_lobby")
+    page.get_by_role("button", name="Start game").click()
+    expect(page.locator(".board.cb")).to_be_visible()
+    expect(page.locator(".clk").first).to_contain_text(":")
+    for _ in range(40):                                              # if the computer has White it moves first
+        if page.locator(".hint", has_text="Tap a piece").count():
+            break
+        page.wait_for_timeout(300)
+    # play the first legal pawn move by driving the board: click a piece that has moves, then a target
+    moved = False
+    for sq in page.locator(".cb .hit").all():
+        sq.click()
+        if page.locator(".cb circle[fill='#6fe3b0']").count():
+            bb = page.locator(".cb circle[fill='#6fe3b0']").first.bounding_box()
+            page.mouse.click(bb["x"] + bb["width"] / 2, bb["y"] + bb["height"] / 2)
+            moved = True
+            break
+    assert moved
+    expect(page.locator(".moves span").first).to_be_visible()
+    page.wait_for_timeout(300)
+    for _ in range(60):                                              # the computer replies
+        if page.locator(".moves span").count() >= 2:
+            break
+        page.wait_for_timeout(300)
+    assert page.locator(".moves span").count() >= 2
+    snap("chess_play")
+    expect(page.locator(".hint", has_text="Tap a piece")).to_be_visible()      # my turn again
+    before = page.locator(".moves span").count()
+    page.get_by_role("button", name="↩️ Undo").click()               # computer allows the takeback instantly
+    page.wait_for_timeout(500)
+    assert page.locator(".moves span").count() == before - 2
+    page.get_by_role("button", name="🏳 Resign").click(); page.get_by_role("button", name="Resign").last.click()
+    expect(page.locator(".win-t")).to_be_visible()
+    page.get_by_role("button", name="Leave table").click()
+
+    # --- uno with house rules
+    table("uno")
+    page.get_by_text("7-0: swap & rotate hands").click(); page.get_by_text("Jump-in").click()
+    snap("uno_lobby")
+    page.get_by_role("button", name="Start game").click()
+    expect(page.locator(".hand .uc").first).to_be_visible()
+    snap("uno_play")
+    page.get_by_role("button", name="Leave table").count()
+    page.locator(".pg-top .ibtn").first.click()
+
+    # --- ludo: dice animation then the computer plays on its own
+    table("ludo")
+    snap("ludo_lobby")
+    page.get_by_role("button", name="Start game").click()
+    expect(page.locator(".board")).to_be_visible()
+    for _ in range(40):
+        if page.locator(".dice.can").count():
+            break
+        page.wait_for_timeout(300)
+    page.locator(".dice").click(force=True)
+    page.wait_for_timeout(1200)
+    snap("ludo_play")
+    assert page.locator(".dice b.on").count() >= 1
+    page.locator(".pg-top .ibtn").first.click()
+
+    # --- settings sheet changes the board / card back
+    page.locator('button[aria-label="Look and sound settings"]').first.click()
+    page.get_by_role("button", name="Rose gold").click()
+    assert page.evaluate("document.querySelector('.pg').dataset.cb") == "3"
+    page.get_by_role("button", name="Done").click()
+    assert not page.ella_errors, [e[:300] for e in page.ella_errors]
