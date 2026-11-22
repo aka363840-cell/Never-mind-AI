@@ -41,7 +41,7 @@ def stack(tmp_path_factory):
     from ella_server.app import create_app
     up = Srv(fake_upstream.make_app(), free_port()).start()
     os.environ.update({
-        "ELLA_DEV": "1", "ELLA_BOT_TOKEN": BOT_TOKEN, "ELLA_SESSION_SECRET": "s" * 48, "ELLA_DATA_DIR": str(tmp_path_factory.mktemp("e2e")),
+        "ELLA_ADS_POLICY": "verified_only", "ELLA_DEV": "1", "ELLA_BOT_TOKEN": BOT_TOKEN, "ELLA_SESSION_SECRET": "s" * 48, "ELLA_DATA_DIR": str(tmp_path_factory.mktemp("e2e")),
         "ELLA_CATALOGUE_URL": f"{up.url}/api/games.json", "ELLA_EMBED_HOSTS": f"127.0.0.1:{up.port}", "ELLA_SCAN_ON_START": "1",
         "ELLA_SCAN_BROWSER": "0", "ELLA_RATE_IP_PER_MIN": "100000", "ELLA_RATE_AUTH_PER_MIN": "1000", "ELLA_PUBLIC_URL": "http://127.0.0.1"})
     app = create_app(config.load())

@@ -168,7 +168,7 @@ function homeSections(d) {
   if (d.featured.length) out.push(section("Featured", rail(d.featured, "feat")));
   if (d.recent.length) out.push(section("Continue playing", rail(d.recent, "sm")));
   out.push(section("Categories", h("div", { class: "cats" }, d.categories.filter((c) => c.count > 0).map((c) =>
-    h("button", { class: "cat", onclick: () => goGames({ category: c.id }) }, h("span", { class: "ico" }, icon(c.icon)), h("b", {}, c.name), h("small", {}, `${c.count} games`))))));
+    h("button", { class: "cat", onclick: () => goGames({ category: c.id }) }, h("span", { class: "ico" }, icon(c.icon)), h("span", { class: "txt" }, h("b", {}, c.name), h("small", {}, `${c.count} games`)))))));
   if (d.popular.length) out.push(section("Popular", rail(d.popular, "sm"), h("button", { onclick: () => goGames({}) }, "All games")));
   out.push(section("Favourites", d.favorites.length ? rail(d.favorites, "sm")
     : h("div", { class: "empty-card" }, icon("heart"), h("span", {}, "Tap the heart on any game to keep it here."))));

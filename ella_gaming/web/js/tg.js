@@ -12,8 +12,8 @@ export const tg = {
     if (!W) return;
     try { W.ready(); } catch {}
     try { W.expand(); } catch {}
-    try { if (ver("6.1")) { W.setHeaderColor("#07060f"); W.setBackgroundColor("#07060f"); } } catch {}
-    try { if (ver("7.10")) W.setBottomBarColor("#0a0818"); } catch {}
+    try { if (ver("6.1")) { W.setHeaderColor("#0c0811"); W.setBackgroundColor("#0c0811"); } } catch {}
+    try { if (ver("7.10")) W.setBottomBarColor("#160f1f"); } catch {}
   },
   setBack(handler) {
     if (!W || !W.BackButton) return;

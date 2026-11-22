@@ -75,7 +75,7 @@ def upstream():
 def settings(upstream, tmp_path):
     from ella_server import config
     os.environ.update({
-        "ELLA_DEV": "1", "ELLA_BOT_TOKEN": BOT_TOKEN, "ELLA_SESSION_SECRET": "s" * 48, "ELLA_DATA_DIR": str(tmp_path),
+        "ELLA_ADS_POLICY": "verified_only", "ELLA_DEV": "1", "ELLA_BOT_TOKEN": BOT_TOKEN, "ELLA_SESSION_SECRET": "s" * 48, "ELLA_DATA_DIR": str(tmp_path),
         "ELLA_CATALOGUE_URL": f"{upstream.url}/api/games.json", "ELLA_EMBED_HOSTS": f"127.0.0.1:{upstream.port}",
         "ELLA_SCAN_ON_START": "1", "ELLA_SCAN_BROWSER": "0", "ELLA_ADMIN_IDS": "1001", "ELLA_RATE_AUTH_PER_MIN": "1000",
         "ELLA_RATE_IP_PER_MIN": "100000", "ELLA_PUBLIC_URL": "http://127.0.0.1",
