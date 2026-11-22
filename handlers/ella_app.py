@@ -26,7 +26,7 @@ from utils.telegram import safe_answer, safe_edit
 
 router = Router()
 
-TITLE = "🎮 <b>Ella Gaming</b>\nFree HTML5 games. Your favourites and recent games are saved in the app."
+TITLE = "🎮 <b>𝑬𝒍𝒍𝒂 𝑮𝒂𝒎𝒊𝒏𝒈</b>\n<i>Hundreds of free games, one tap away.</i>\n\n♡ Save your favourites\n♡ Pick up right where you left off"
 NOT_READY = "🎮 <b>Ella Gaming</b> isn't switched on yet. The owner needs to set <code>ELLA_GAMING_URL</code>."
 
 
@@ -62,7 +62,7 @@ def launch_markup(private: bool, bot_username: str = "", back_row: list[B] | Non
 
 
 def page_text(private: bool) -> str:
-    return TITLE if private else TITLE + "\n<i>Mini Apps open in private chat - tap the button to continue there.</i>"
+    return TITLE if private else TITLE + "\n\n<i>✦ Opens in our private chat, tap below to play.</i>"
 
 
 @router.message(Command("app"))
