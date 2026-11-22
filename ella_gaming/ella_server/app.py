@@ -114,7 +114,9 @@ def cards(cat: Catalogue, slugs: list[str]) -> list[dict]:
 # ----------------------------------------------------------------------------------------------- routes
 async def healthz(request: Request):
     cat: Catalogue = request.app.state.cat
-    return JSONResponse({"ok": True, "games_loaded": len(cat.games), "eligible": len(cat.eligible_slugs())})
+    return JSONResponse({"ok": True, "games_loaded": len(cat.games), "eligible": len(cat.eligible_slugs()),
+                         "catalogue_error": cat.last_error, "feed_entries": cat.raw_count, "dropped": cat.invalid_count,
+                         "dropped_examples": cat.invalid[:3], "fetched_at": int(cat.fetched_at)})
 
 
 async def auth_telegram(request: Request):
