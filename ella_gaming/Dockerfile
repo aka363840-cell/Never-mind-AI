@@ -5,6 +5,8 @@ ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_NO_CACHE_DIR=1 ELLA_DATA_DI
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
+# Playwright's bundled node needs libatomic (missing in the slim image)
+RUN apt-get update && apt-get install -y --no-install-recommends libatomic1 && rm -rf /var/lib/apt/lists/*
 # Chromium for the runtime ad check (adds ~400 MB). Use --build-arg WITH_BROWSER=0 to skip; games that are not provably ad-free then stay hidden.
 ARG WITH_BROWSER=1
 RUN if [ "$WITH_BROWSER" = "1" ]; then playwright install --with-deps chromium; fi
