@@ -478,6 +478,14 @@ def lobby_text(r):
     return f"{ico} <b>{title} · Premium</b>  <code>{r.code}</code>\n\n{st}\n\n{rows}"
 
 
+async def ensure_bot_name(token):
+    if not BOT_NAME and token:
+        try:
+            BOT_NAME.append((await tg(token, "getMe"))["result"]["username"])
+        except Exception:
+            log.warning("premium: getMe failed, group cards may have no buttons")
+
+
 def lobby_markup(r):
     link = invite_link(r)
     if not link:
@@ -503,8 +511,10 @@ async def post_msg(r, token):
     try:
         res = await tg(token, "sendMessage", chat_id=r.chat_id, text=lobby_text(r), parse_mode="HTML", reply_markup=lobby_markup(r) or {"inline_keyboard": []})
         r.msg_id = res["result"]["message_id"]
+        return True
     except Exception:
         log.exception("premium: could not post the lobby message")
+        return False
 
 
 async def push_msg(r):
@@ -532,11 +542,7 @@ def build_routes(m):
         if not p:
             raise ApiError(401, "unauthorized", "Unknown player")
         pp = m.public_player(p)
-        if not BOT_NAME and m.S(request).bot_token:
-            try:
-                BOT_NAME.append((await tg(m.S(request).bot_token, "getMe"))["result"]["username"])
-            except Exception:
-                pass
+        await ensure_bot_name(m.S(request).bot_token)
         return {"id": uid, "name": pp["display_name"][:24], "photo": pp["photo_url"] or ""}
 
     def room(request):
@@ -648,7 +654,9 @@ def build_routes(m):
         elif me["id"] not in r.ids and r.status == "lobby" and len(r.players) < GAMES[game][1]:
             r.players.append(me)
             bump(r)
-        await post_msg(r, st.bot_token)                   # always a fresh, bottom-of-chat lobby card
+        await ensure_bot_name(st.bot_token)
+        if not await post_msg(r, st.bot_token):           # always a fresh, bottom-of-chat lobby card
+            raise ApiError(502, "telegram_failed", "Could not post the table card in this chat.")
         return JSONResponse({"code": r.code})
 
     P = "/api/premium"
