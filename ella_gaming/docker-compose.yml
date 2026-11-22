@@ -1,0 +1,16 @@
+# docker compose up -d --build        (run in this folder, with a filled-in .env next to it)
+services:
+  ella-gaming:
+    build: .
+    container_name: ella-gaming
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      ELLA_DATA_DIR: /data
+    volumes:
+      - ./data:/data
+    ports:
+      - "127.0.0.1:8080:8080"     # only the reverse proxy (Caddy / nginx) talks to it; do not expose it directly
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}

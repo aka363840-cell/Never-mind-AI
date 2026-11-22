@@ -254,3 +254,7 @@ After a restart the bot needs no manual recovery: open duels/bounties are expire
 - `/protect 1h` · `/protect 2h` … up to 24h: costs `protect_cost_per_hour` (125) × hours, paid from the wallet. A protected player cannot be killed or robbed. Attacking drops your own protection.
 - `/deposit`: the bank may hold at most **50%** of wallet + bank (`bank_max_pct`). `/deposit all` deposits as much as is allowed.
 - The kill result message only shows the winner/loser (clickable) and the revive line.
+
+## 🎮 Ella Gaming (separate Mini App)
+`ella_gaming/` is an independent free-games Mini App (own server, database and UI). The bot is only its launcher: `/app` and the
+🕹 Games hub button open it. Set `ELLA_GAMING_URL` in `.env` to switch the launcher on. Setup, deployment and BotFather steps: `ella_gaming/README.md`.

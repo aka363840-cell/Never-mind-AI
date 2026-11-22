@@ -1,0 +1,7 @@
+data
+tests
+docs
+tools
+.pytest_cache
+__pycache__
+.env

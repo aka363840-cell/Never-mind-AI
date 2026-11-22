@@ -1,0 +1,5 @@
+# Automatic HTTPS (Let's Encrypt) - point your domain's DNS A/AAAA record at the server first.
+games.example.com {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8080
+}

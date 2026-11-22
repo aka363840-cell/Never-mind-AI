@@ -1,0 +1,19 @@
+[Unit]
+Description=Ella Gaming (Telegram Mini App server)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__DIR__
+EnvironmentFile=__DIR__/.env
+ExecStart=__DIR__/.venv/bin/python -m ella_server
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=__DIR__
+
+[Install]
+WantedBy=multi-user.target

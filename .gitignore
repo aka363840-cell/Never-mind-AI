@@ -4,3 +4,7 @@ __pycache__/
 .pytest_cache/
 *.pyc
 emoji_packs_cache.json
+
+# Ella Gaming (separate Mini App service)
+ella_gaming/data/
+ella_gaming/.env
