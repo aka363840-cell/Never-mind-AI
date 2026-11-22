@@ -13,10 +13,16 @@ const PIECE = { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" };
 const GLYPH = { s: "⊘", r: "⇄", d: "+2", "4": "+4", "": "" };
 const TOKEN_COLORS = [["red", "#ff6b6b", "#c4161f"], ["green", "#46dd86", "#0f8a47"], ["yellow", "#ffe066", "#e0a400"], ["blue", "#5b98ff", "#1743b8"]];
 
+// Remember the table you are in (survives refresh) and the tables you left on purpose (so an old invite link never drags you back in).
+const LS = { get(k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+const lastRoom = { get: () => { const l = LS.get("ella.pg.last"); return l && Date.now() - l.t < 3 * 3600e3 ? l.code : null; }, set: (code) => LS.set("ella.pg.last", { code, t: Date.now() }), clear: () => LS.set("ella.pg.last", null) };
+const left = { has: (c) => (LS.get("ella.pg.left") || []).includes(c), add: (c) => LS.set("ella.pg.left", [...(LS.get("ella.pg.left") || []).filter((x) => x !== c), c].slice(-20)) };
+export function resumeParam() { const c = lastRoom.get(); return c ? { code: c, quiet: true } : null; }
+
 export function startParam() {
   const w = window.Telegram && window.Telegram.WebApp;
   const sp = (w && w.initDataUnsafe && w.initDataUnsafe.start_param) || new URLSearchParams(location.search).get("pg") || "";
-  if (/^pg_[A-Z0-9]{5}$/.test(sp)) return { code: sp.slice(3) };
+  if (/^pg_[A-Z0-9]{5}$/.test(sp)) return { code: sp.slice(3), invite: true };
   return sp === "uno" || sp === "ludo" || sp === "chess" ? { game: sp } : null;
 }
 
@@ -76,25 +82,26 @@ export function openPremium(ctx, start) {
   const ticks = [], put = (...k) => inner.replaceChildren(...k.filter(Boolean));
   const toast = ctx.toast, errText = (e) => (e && e.message) || "Something went wrong.";
   const back = () => { if (room) leaveView(); else close(); };
-  function close() { gen++; ctl && ctl.abort(); clearInterval(timer); ov.remove(); ctx.popLayer(back); tg.playing(false); }
+  function close() { gen++; ctl && ctl.abort(); clearInterval(timer); document.removeEventListener("visibilitychange", wake); window.removeEventListener("online", wake); ov.remove(); ctx.popLayer(back); tg.playing(false); }
   ctx.pushLayer(back);
+  const wake = async () => { if (document.hidden || !room) return; const code = room.code; try { const d = await call("GET", `/api/premium/rooms/${code}`); if (room && room.code === code) { apply(d); watch(); } } catch (e) { if (e.status === 404) { lastRoom.clear(); toast("This table was closed."); leaveView(); } } };
+  document.addEventListener("visibilitychange", wake); window.addEventListener("online", wake);
   const hdr = (title, sub, onBack) => h("div", { class: "pg-top" }, h("button", { class: "ibtn", "aria-label": "Back", onclick: onBack || back }, icon("back")), h("h1", {}, title, sub ? h("small", {}, sub) : null),
     h("button", { class: "ibtn", "aria-label": "Look and sound settings", onclick: () => settingsSheet(ov, () => themeAttrs(ov)) }, "⚙\uFE0E"));
 
-  function leaveView() { gen++; ctl && ctl.abort(); clearInterval(timer); room = null; board = null; tg.playing(false); hub(); }
+  function leaveView() { gen++; ctl && ctl.abort(); clearInterval(timer); lastRoom.clear(); room = null; board = null; tg.playing(false); hub(); }
 
   async function hub() {
-    put(hdr("Premium Games", "Play live with friends", close),
+    put(hdr("Premium Games", "Play live with friends", close), h("div", { id: "mine" }),
       h("div", { class: "tiles" }, tile("uno", "House rules, UNO call, jump-in. Play friends or the computer.", fanArt()), tile("ludo", "Race four tokens home. Solo, teams or vs computer.", ludoArt()), tile("chess", "Full rules, clocks, takebacks. Duel a friend or the computer.", chessArt())),
       h("h3", { class: "sub" }, "Have an invite code?"),
       (() => { const inp = h("input", { maxlength: "5", placeholder: "CODE", "aria-label": "Table code", autocapitalize: "characters" });
-        return h("div", { class: "joinrow" }, inp, h("button", { class: "pbtn", onclick: () => enter(inp.value.trim().toUpperCase()) }, "Join")); })(),
-      h("div", { id: "mine" }));
+        return h("div", { class: "joinrow" }, inp, h("button", { class: "pbtn", onclick: () => enter(inp.value.trim().toUpperCase()) }, "Join")); })());
     try {
       const { rooms } = await call("GET", "/api/premium/mine"); if (room) return;
       const box = inner.querySelector("#mine"); if (!box || !rooms.length) return;
-      box.append(h("h3", { class: "sub" }, "Your tables"), ...rooms.map((r) => h("button", { class: "mine", onclick: () => enter(r.code) },
-        h("span", { class: "dot " + (r.status === "playing" ? "on" : "") }), h("b", {}, NAMES[r.game], r.group ? " · " + r.group : ""), h("small", {}, r.status === "playing" ? "In progress" : `Waiting ${r.players}`))));
+      box.append(h("h3", { class: "sub first" }, "Continue playing"), ...rooms.map((r) => h("button", { class: "resume " + r.game, onclick: () => enter(r.code) },
+        h("span", { class: "dot " + (r.status === "playing" ? "on" : "") }), h("span", { class: "rt" }, h("b", {}, NAMES[r.game], r.group ? " · " + r.group : ""), h("small", {}, r.status === "playing" ? "Game in progress" : `Waiting for players (${r.players})`)), h("span", { class: "go2" }, "Resume"))));
     } catch {}
   }
   function tile(game, text, art) {
@@ -106,23 +113,28 @@ export function openPremium(ctx, start) {
     s.append(S("text", { x: 15, y: 26, "font-size": 20, class: "gl wp" }, "♞\uFE0E"), S("text", { x: 25, y: 16, "font-size": 12, class: "gl bp" }, "♛\uFE0E")); return s; }
   function ludoArt() { const s = buildBoard(); s.setAttribute("class", "art"); return s; }
 
-  async function enter(code) {
+  async function enter(code, o = {}) {
     if (!/^[A-Z0-9]{5}$/.test(code)) return toast("Enter the 5-character table code.");
-    try { let d = await call("GET", `/api/premium/rooms/${code}`); if (!d.players.some((p) => p.id === d.me) && d.status === "lobby") d = await call("POST", `/api/premium/rooms/${code}/act`, { a: "join" }); apply(d); watch(); }
-    catch (e) { toast(errText(e)); if (!room) hub(); }
+    try {
+      let d = await call("GET", `/api/premium/rooms/${code}`), mineNow = d.players.some((p) => p.id === d.me);
+      if (o.quiet && (d.status === "done" || !mineNow)) { lastRoom.clear(); return room ? null : o.fromBoot ? close() : hub(); }          // refresh: only resume a live table you are in
+      if (!mineNow && d.status === "lobby") { if (o.invite && left.has(code)) return hub(); d = await call("POST", `/api/premium/rooms/${code}/act`, { a: "join" }); }
+      apply(d); watch();
+    } catch (e) { if (o.quiet) { lastRoom.clear(); return room ? null : o.fromBoot ? close() : hub(); } toast(errText(e)); if (!room) hub(); }
   }
-  async function act(a, extra = {}) { try { const d = await call("POST", `/api/premium/rooms/${room.code}/act`, { a, ...extra }); if (d && d.left) return; apply(d); } catch (e) { toast(errText(e)); } }
+  async function act(a, extra = {}) { try { const code = room.code; if (a === "leave") { left.add(code); lastRoom.clear(); } const d = await call("POST", `/api/premium/rooms/${code}/act`, { a, ...extra }); if (d && d.left) return; apply(d); } catch (e) { toast(errText(e)); } }
   async function watch() {
     const my = ++gen; ctl && ctl.abort(); ctl = new AbortController(); const code = room.code;
+    let fails = 0;
     while (gen === my) {
-      try { const d = await call("GET", `/api/premium/rooms/${code}?v=${room.v}&wait=1`, undefined, { signal: ctl.signal }); if (gen !== my) return; if (!d.same) apply(d); }
-      catch (e) { if (gen !== my || e.name === "AbortError") return; if (e.status === 404) { toast("This table was closed."); return leaveView(); } await sleep(1500); }
+      try { const d = await call("GET", `/api/premium/rooms/${code}?v=${room.v}&wait=1`, undefined, { signal: ctl.signal }); if (gen !== my) return; fails = 0; if (!d.same) apply(d); }
+      catch (e) { if (gen !== my || e.name === "AbortError") return; if (e.status === 404) { lastRoom.clear(); toast("This table was closed."); return leaveView(); } if (++fails === 3) toast("Reconnecting…"); await sleep(Math.min(1500 * fails, 5000)); }
     }
   }
   function apply(d) {
     if (hold) { if (!pend || d.v > pend.v) pend = d; return; }
     if (room && d.v <= room.v && d.code === room.code) return;
-    const prev = room, first = !room || room.code !== d.code; cSel = null; room = d; recvAt = Date.now(); if (first) board = null; render(); if (!first) fx(prev, d);
+    const prev = room, first = !room || room.code !== d.code; cSel = null; room = d; recvAt = Date.now(); if (d.players.some((p) => p.id === d.me)) lastRoom.set(d.code); if (first) board = null; render(); if (!first) fx(prev, d);
   }
   function fx(p, d) {
     if (!p || !p.g || !d.g) return;
@@ -326,5 +338,5 @@ export function openPremium(ctx, start) {
     ov.append(sh);
   }
 
-  if (start && start.code) enter(start.code); else hub();
+  if (start && start.code) enter(start.code, { quiet: !!start.quiet, invite: !!start.invite, fromBoot: !!start.quiet }); else hub();
 }

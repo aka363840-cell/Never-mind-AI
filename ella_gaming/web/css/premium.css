@@ -108,3 +108,7 @@
 .moves::-webkit-scrollbar{display:none}.moves .bk{margin-right:6px}.moves .wh{color:var(--text)}.moves .bk{color:var(--muted)}.moves:empty::before{content:"Moves appear here";color:var(--muted)}
 .offer{display:flex;align-items:center;gap:8px;margin:10px 0;padding:10px 12px;border-radius:16px;background:var(--surface2);border:1px solid var(--gold2);font-weight:700;font-size:13px}.offer span{flex:1}.offer .pbtn{min-height:38px;padding:0 14px;font-size:13px}
 .tbl{display:grid;gap:6px;margin:0 0 16px;text-align:left}.tbl div{display:flex;justify-content:space-between;padding:8px 12px;border-radius:12px;background:var(--surface2)}.tbl b{color:var(--gold)}
+/* resume cards */
+.pg h3.sub.first{margin-top:4px}
+.resume{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;margin-bottom:10px;border-radius:20px;text-align:left;color:var(--text);border:1px solid rgba(244,199,107,.5);background:radial-gradient(90% 200% at 100% 0,rgba(244,199,107,.22),transparent 60%),#150f20}
+.resume .rt{flex:1;min-width:0;display:flex;flex-direction:column}.resume .rt small{color:var(--muted)}.resume .go2{padding:8px 16px;border-radius:99px;font-weight:800;font-size:13px;color:#2a1b00;background:linear-gradient(180deg,#ffe3a0,#f4c76b)}

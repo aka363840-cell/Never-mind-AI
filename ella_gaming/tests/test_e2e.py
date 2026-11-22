@@ -338,6 +338,32 @@ def test_screenshots_for_report(browser, stack):
     page.ctx.close()
 
 
+def test_premium_refresh_and_resume(browser, stack):
+    """Refreshing the Mini App during a game drops you back into it; Back leads to a Resume card; a table you left is not re-joined."""
+    ella, _ = stack
+    page = new_page(browser, ella)
+    page.goto(ella.url)
+    tab(page, "premium")
+    page.locator(".tile.ludo .go").click()
+    page.get_by_text("🤖 Add computer").click()
+    page.get_by_role("button", name="Start game").click()
+    expect(page.locator(".board")).to_be_visible()
+    code = page.evaluate("JSON.parse(localStorage.getItem('ella.pg.last')).code")
+    page.reload()                                                     # refresh in the middle of the game
+    expect(page.locator(".board")).to_be_visible()
+    expect(page.locator(".pg-top h1")).to_contain_text("LUDO")
+    page.locator(".pg-top .ibtn").first.click()                       # Back -> hub with a Resume card
+    expect(page.locator(".resume")).to_be_visible()
+    page.locator(".resume").click()
+    expect(page.locator(".board")).to_be_visible()
+    page.locator(".pg-top .ibtn").first.click()
+    page.locator(".pg-top .ibtn").first.click()                       # close premium; nothing to resume after a deliberate Back
+    page.reload()
+    expect(page.locator(".greet h1")).to_be_visible()
+    assert page.locator(".pg").count() == 0
+    assert not page.ella_errors, [e[:300] for e in page.ella_errors]
+
+
 def test_premium_vs_computer(browser, stack):
     """Premium Games: add a computer player, start each game, play a move, the computer answers; no JS errors."""
     ella, _ = stack

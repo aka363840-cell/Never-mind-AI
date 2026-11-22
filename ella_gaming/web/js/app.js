@@ -1,7 +1,7 @@
 import { h, icon } from "./dom.js";
 import { tg } from "./tg.js";
 import { api, login, ApiError } from "./api.js";
-import { premiumEntry, openPremium, startParam } from "./premium.js";
+import { premiumEntry, openPremium, startParam, resumeParam } from "./premium.js?v=5";
 
 const $ = (s) => document.querySelector(s);
 const view = $("#view"), nav = $("#nav"), root = $("#overlay-root"), toastEl = $("#toast");
@@ -382,6 +382,6 @@ async function boot() {
     return;
   }
   buildNav(); setTab("home");
-  const sp = startParam(); if (sp) openPremium(PCTX, sp);
+  const sp = startParam() || resumeParam(); if (sp) openPremium(PCTX, sp);
 }
 boot();
