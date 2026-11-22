@@ -171,6 +171,8 @@ class Catalogue:
         if slug not in self.games:
             return False
         v = self.verdicts.get(slug, {}).get("verdict")
+        if self.st.ads_policy == "show_all":      # list every embeddable game, ads or not (games may show provider ads)
+            return v != "blocked"
         if self.st.ads_policy == "trust_provider":
             return v not in ("ads", "blocked")
         return v == "clean"

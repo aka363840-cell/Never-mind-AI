@@ -50,7 +50,7 @@ class Settings:
     catalogue_url: str                   # ELLA_CATALOGUE_URL
     embed_hosts: tuple[str, ...]         # ELLA_EMBED_HOSTS - the ONLY hosts a game may be loaded from
     catalogue_ttl: int                   # seconds (GameZipper asks for <= 6 h client-side caching)
-    ads_policy: str                      # verified_only (default) | trust_provider
+    ads_policy: str                      # show_all (default) | verified_only | trust_provider
     scan_ttl: int                        # seconds before a verdict is re-checked
     scan_concurrency: int
     scan_on_start: bool
@@ -105,7 +105,7 @@ def load() -> Settings:
         catalogue_url=os.getenv("ELLA_CATALOGUE_URL", "https://gamezipper.com/api/games.json").strip(),
         embed_hosts=tuple(h.lower() for h in _list("ELLA_EMBED_HOSTS", "gamezipper.com")),
         catalogue_ttl=_int("ELLA_CATALOGUE_TTL", 6 * 3600),
-        ads_policy=os.getenv("ELLA_ADS_POLICY", "verified_only").strip().lower(),
+        ads_policy=os.getenv("ELLA_ADS_POLICY", "show_all").strip().lower(),
         scan_ttl=_int("ELLA_SCAN_TTL", 7 * 86400),
         scan_concurrency=max(1, min(_int("ELLA_SCAN_CONCURRENCY", 6), 20)),
         scan_on_start=_bool("ELLA_SCAN_ON_START", True),

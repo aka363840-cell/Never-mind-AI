@@ -26,7 +26,7 @@ from utils.telegram import safe_answer, safe_edit
 
 router = Router()
 
-TITLE = "🎮 <b>Ella Gaming</b>\nFree HTML5 games, zero ads. Your favourites and recent games are saved in the app."
+TITLE = "🎮 <b>Ella Gaming</b>\nFree HTML5 games. Your favourites and recent games are saved in the app."
 NOT_READY = "🎮 <b>Ella Gaming</b> isn't switched on yet. The owner needs to set <code>ELLA_GAMING_URL</code>."
 
 

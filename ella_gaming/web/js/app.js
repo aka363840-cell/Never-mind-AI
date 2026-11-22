@@ -148,7 +148,7 @@ async function renderHome() {
   const name = (S.player && S.player.display_name) || "player";
   const head = [topbar(),
     h("div", { class: "greet" }, h("small", {}, greeting() + ","), h("h1", {}, h("span", {}, name))),
-    h("p", { class: "tagline" }, "Free games. Zero ads."),
+    h("p", { class: "tagline" }, "Free games to play."),
     searchBox("", null, (q) => goGames({ q }))];
   const body = h("div", {});
   view.replaceChildren(...head, body);
@@ -241,7 +241,7 @@ function openSheet(g) {
     h("div", { class: "grab" }), h("div", { class: "hero" }, thumb(g)), h("h2", {}, g.name), tagBox,
     h("div", { class: "actions" }, playBtn,
       h("button", { class: "sq", dataset: { fav: g.slug }, "aria-label": "Favourite", "aria-pressed": String(S.favs.has(g.slug)), onclick: () => toggleFav(g.slug) }, icon("heart"))),
-    h("p", { class: "fine" }, icon("shield"), "Free to play, no ads. Controls differ per game."));
+    h("p", { class: "fine" }, icon("shield"), "Free to play. Games may show their own ads. Controls differ per game."));
   root.append(backdrop, sheet); sheetClose = close; pushLayer(close);
   api.game(g.slug).then((d) => {                       // details (tags) + confirms the game is still available
     if (sheet.dataset.closed) return;
@@ -357,7 +357,7 @@ async function renderProfile(quiet = false) {
     h("div", { class: "field" }, input, save),
     section("Favourites", d.favorites.length ? h("div", { class: "grid" }, d.favorites.map((g) => card(g))) : h("div", { class: "empty-card" }, icon("heart"), h("span", {}, "No favourites yet. Tap the heart on a game."))),
     section("Recently played", hist.length ? h("div", { class: "list" }, hist) : h("div", { class: "empty-card" }, icon("clock"), h("span", {}, "Games you launch will show up here."))),
-    h("div", { class: "about" }, h("b", {}, "Ella Gaming"), " is a separate, ad-free game space. Your profile, favourites and history here are stored only for Ella Gaming - they are not linked to anything else in the bot."));
+    h("div", { class: "about" }, h("b", {}, "Ella Gaming"), " is a separate game space. Your profile, favourites and history here are stored only for Ella Gaming - they are not linked to anything else in the bot."));
 }
 
 // ------------------------------------------------------------------ boot
