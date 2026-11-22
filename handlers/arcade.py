@@ -57,6 +57,8 @@ GAME_INFO = {
           "/jumble or /jum · /jskip · /jlb leaderboard · /jstats · /endgame",
     "ch": "🎭 <b>Charades</b> (groups)\nThe host gets a secret word in DM and describes it with emojis, clues or text - everybody else guesses by typing. After each round a button lets anyone become the next host.\n"
           "/charades or /describe · /endgame",
+    "pg": "👑 <b>Premium Games</b> (UNO · Ludo · Chess)\nTables play inside the Mini App: create one, share the link or 5-letter code, friends join in one tap. In a group the command posts a live card (waiting / whose turn / winner).\n"
+          "/uno 2-6 players · /ludo 2-4 players · /chess 2 players",
 }
 
 
@@ -84,6 +86,7 @@ async def hub(uid: int) -> tuple[str, InlineKeyboardMarkup]:
             "⛓ /wc (+ /starthard /startelim …) · /join · /flee · /wcmodes · /wcstats · /wclb — Word Chain\n"
             "🐙 /jumble (/jum) · /jskip · /jlb · /jstats — unscramble words\n"
             "🎭 /charades (/describe) — describe it, the host rotates\n"
+            "👑 /uno · /ludo · /chess — premium tables in the Mini App, invite by link\n"
             "⚡ /tap <i>amount</i> — best-of-3 reflex battle (<code>/tap free</code> to practice) · /taptop\n"
             "💥 /crash <i>amount</i> — best-of-3 word-picture count battle (<code>/crash free</code>) · /crashtop\n"
             "⭕ /ttt <i>[reply/@user]</i> — tic-tac-toe with a friend\n"
@@ -96,7 +99,7 @@ async def hub(uid: int) -> tuple[str, InlineKeyboardMarkup]:
             [B(text="🐙 Jumble", callback_data="ar:jm"), B(text="🎭 Charades", callback_data="ar:ch")],
             [B(text="⚡ Fastest Tap", callback_data="ar:tap"), B(text="💥 Crash Count", callback_data="ar:cr")],
             [B(text="⭕ Tic-Tac-Toe", callback_data="ar:ttt"), B(text="🤔 Would you rather", callback_data="ar:wy")],
-            [B(text="🍆 Dick game", callback_data="ar:dk")],
+            [B(text="👑 UNO · Ludo · Chess", callback_data="ar:pg"), B(text="🍆 Dick game", callback_data="ar:dk")],
             [B(text="🎟 Solo & daily fun ➡️", callback_data="ar:solo")],
             [B(text="🎮 Ella Gaming (free games app)", callback_data="ella:app")],
             back()]

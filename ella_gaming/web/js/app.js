@@ -1,6 +1,7 @@
 import { h, icon } from "./dom.js";
 import { tg } from "./tg.js";
 import { api, login, ApiError } from "./api.js";
+import { premiumEntry, openPremium, startParam } from "./premium.js";
 
 const $ = (s) => document.querySelector(s);
 const view = $("#view"), nav = $("#nav"), root = $("#overlay-root"), toastEl = $("#toast");
@@ -13,6 +14,7 @@ const S = {
 let sheetClose = null;
 let layers = [];          // open overlays, top = last; each entry closes itself
 let renderToken = 0;
+const PCTX = { pushLayer: (f) => pushLayer(f), popLayer: (f) => popLayer(f), toast: (m) => toast(m), avatar: (p) => avatar(p) };
 
 // ------------------------------------------------------------------ small helpers
 function toast(msg, ms = 2600) {
@@ -149,6 +151,7 @@ async function renderHome() {
   const head = [topbar(),
     h("div", { class: "greet" }, h("small", {}, greeting() + ","), h("h1", {}, h("span", {}, name))),
     h("p", { class: "tagline" }, "Free games to play."),
+    premiumEntry(PCTX),
     searchBox("", null, (q) => goGames({ q }))];
   const body = h("div", {});
   view.replaceChildren(...head, body);
@@ -379,5 +382,6 @@ async function boot() {
     return;
   }
   buildNav(); setTab("home");
+  const sp = startParam(); if (sp) openPremium(PCTX, sp);
 }
 boot();

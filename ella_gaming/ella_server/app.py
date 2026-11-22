@@ -5,6 +5,7 @@ import asyncio
 import contextlib
 import logging
 import re
+import sys
 import time
 from datetime import datetime
 
@@ -16,7 +17,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from . import auth, categories
+from . import auth, categories, premium
 from .catalogue import SLUG_RX, Catalogue
 from .config import Settings, load
 from .db import Database
@@ -395,6 +396,7 @@ def create_app(st: Settings | None = None) -> Starlette:
         Route("/api/sessions/{sid}/end", session_touch, methods=["POST"]),
         Route("/api/admin/report", admin_report, methods=["GET"]),
         Route("/api/admin/rescan", admin_rescan, methods=["POST"]),
+        *premium.build_routes(sys.modules[__name__]),
         Route("/api/{rest:path}", api_not_found),
     ]
     if st.serve_frontend:
