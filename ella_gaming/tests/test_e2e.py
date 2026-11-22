@@ -385,6 +385,7 @@ def test_premium_vs_computer(browser, stack):
     # --- chess with a 3+2 clock
     table("chess")
     page.get_by_role("button", name="3+2").click()
+    expect(page.get_by_role("button", name="3+2")).to_have_attribute("aria-pressed", "true")
     snap("chess_lobby")
     page.get_by_role("button", name="Start game").click()
     expect(page.locator(".board.cb")).to_be_visible()
