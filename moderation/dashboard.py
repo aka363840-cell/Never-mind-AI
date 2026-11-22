@@ -79,7 +79,10 @@ async def render(page: str, chat_id: int, bot: Bot) -> tuple[str, InlineKeyboard
         rows.append(_nav(c))
         return "🔐 <b>Locks</b>\nTap to lock / unlock a message type (admins are exempt). <code>/locktypes</code> shows which are native vs bot-side.", InlineKeyboardMarkup(inline_keyboard=rows)
     if page == "greet":
-        wl, gb = st["welcome"], st["goodbye"]
+        wl, gb = dict(st["welcome"]), dict(st["goodbye"])
+        from . import api
+        wl["on"] = not await api.greeting_switched_off(c, "join")                 # the shown state is the real switch (off = nothing is sent)
+        gb["on"] = not await api.greeting_switched_off(c, "leave")
         rows = [[_b(f"Welcome {_onoff(wl['on'])}", f"mod:t:welcome:{c}"), _b(f"Goodbye {_onoff(gb['on'])}", f"mod:t:goodbye:{c}")],
                 [_b(f"Reports {_onoff(st['report']['on'])}", f"mod:t:reports:{c}")], _nav(c)]
         return (f"👋 <b>Welcome / goodbye</b>\nWelcome {_onoff(wl['on'])}: {esc((wl['text'] or '(default greeting)')[:200])}\nGoodbye {_onoff(gb['on'])}: {esc((gb['text'] or '(none)')[:200])}\n"
@@ -214,9 +217,12 @@ async def dash_toggle(cb: CallbackQuery, bot: Bot):
         await commands_msg.apply_locks(bot, chat_id, [name], not st["locks"].get(name), actor)
         page = "locks"
     elif key in ("welcome", "goodbye"):
-        if not st[key]["on"] and not st[key]["text"]:
-            raise ModError(f"✍️ Set a text first with /set{key}.")
-        await store.save_settings(chat_id, lambda s: s[key].update(on=not s[key]["on"]))
+        from . import api
+        kind = "join" if key == "welcome" else "leave"
+        on = await api.greeting_switched_off(chat_id, kind)                      # it is OFF now -> turn it ON (and the other way round)
+        await api.set_greeting_switch(chat_id, kind, not on)
+        if st[key]["text"]:
+            await store.save_settings(chat_id, lambda s: s[key].update(on=on))
         page = "greet"
     elif key == "reports":
         await store.save_settings(chat_id, lambda s: s["report"].update(on=not s["report"]["on"]))

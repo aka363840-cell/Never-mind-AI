@@ -49,6 +49,13 @@ async def _switched_off(chat_id: int, kind: str) -> bool:
         return False
 
 
+async def set_switched(chat_id: int, kind: str, off: bool) -> None:
+    """The ONE on/off switch of a greeting (used by /welcomemsg, /leavemsg, the buttons, /welcome, /goodbye and the moderation dashboard)."""
+    from services import users
+    async with db.tx() as s:
+        await users.set_state(s, _flag_key(chat_id, kind), "1" if off else "0")
+
+
 async def welcome_on(chat_id: int, kind: str = "join") -> bool:
     """Welcome / goodbye are ON by default. A group admin can switch each off with /welcomemsg off and /leavemsg off.
     A group that configured its OWN welcome / goodbye with the moderation module gets that instead."""

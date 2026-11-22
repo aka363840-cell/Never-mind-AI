@@ -19,10 +19,19 @@ async def legacy_welcome_suppressed(chat_id: int, kind: str = "join") -> bool:
 _greeting_gate = None
 
 
-def set_greeting_gate(fn) -> None:
-    """fn(chat_id, kind 'join'|'leave') -> awaitable bool, True = the group switched that greeting OFF."""
-    global _greeting_gate
-    _greeting_gate = fn
+_greeting_setter = None
+
+
+def set_greeting_gate(fn, setter=None) -> None:
+    """fn(chat_id, kind 'join'|'leave') -> awaitable bool, True = the group switched that greeting OFF.
+    setter(chat_id, kind, off: bool) -> awaitable: flips that same switch (so /welcome, /goodbye and the dashboard share ONE switch with /welcomemsg, /leavemsg)."""
+    global _greeting_gate, _greeting_setter
+    _greeting_gate, _greeting_setter = fn, setter
+
+
+async def set_greeting_switch(chat_id: int, kind: str, off: bool) -> None:
+    if _greeting_setter is not None:
+        await _greeting_setter(chat_id, kind, off)
 
 
 async def greeting_switched_off(chat_id: int, kind: str) -> bool:

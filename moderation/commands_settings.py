@@ -68,6 +68,8 @@ async def _set_greeting(m: Message, command: CommandObject, bot: Bot, key: str):
     text, kb = greet.build(txt, m.from_user, m.chat.title, m.chat.id, None)
     await tg(bot.send_message, m.chat.id, "👁 <b>Preview</b>\n\n" + text, reply_markup=kb, disable_web_page_preview=True)   # invalid markup raises here: nothing saved
     await store.save_settings(r.chat_id, lambda s: s[key].update(text=txt, on=True))
+    from . import api
+    await api.set_greeting_switch(r.chat_id, "join" if key == "welcome" else "leave", False)       # a freshly saved text must not stay muted by an old OFF
     await store.log_action(r.chat_id, r.actor, None, f"set{key}")
     await reply(m, f"✅ {key.capitalize()} message saved and <b>enabled</b>.")
 
@@ -88,16 +90,19 @@ async def _greeting_cmd(m: Message, command: CommandObject, bot: Bot, key: str):
     arg = (command.args or "").strip().lower().split()
     if not arg:
         await perms.require_actor(bot, m.chat.id, m.from_user.id, None)
-        lines = [f"👋 <b>{key.capitalize()}</b>: {'🟢 ON' if sec['on'] else '🔴 OFF'}" + (f" · clean: {'on' if sec.get('clean') else 'off'}" if key == 'welcome' else "")]
+        from . import api
+        off = await api.greeting_switched_off(m.chat.id, "join" if key == "welcome" else "leave")
+        lines = [f"👋 <b>{key.capitalize()}</b>: {'🔴 OFF' if off else '🟢 ON'}" + (f" · clean: {'on' if sec.get('clean') else 'off'}" if key == 'welcome' else "")]
         lines.append("Text:\n" + (esc(sec["text"]) if sec["text"] else "<i>(not set - " + ("the bot's default greeting is used)" if key == "welcome" else "no goodbye is sent)") + "</i>"))
         lines.append(f"\n<code>/{key} on|off</code> · <code>/set{key} …</code> · <code>/reset{key}</code>")
         return await reply(m, "\n".join(lines))
     r = await prepare(m, command, bot, right="info", bot_right=None)
     if arg[0] in ("on", "off", "yes", "no"):
         on = arg[0] in ("on", "yes")
-        if on and not sec["text"]:
-            raise ModError(f"✍️ Set a text first with <code>/set{key} …</code>.")
-        await store.save_settings(r.chat_id, lambda s: s[key].update(on=on))
+        from . import api
+        await api.set_greeting_switch(r.chat_id, "join" if key == "welcome" else "leave", not on)      # OFF = nothing is sent at all (no default greeting either)
+        if sec["text"]:
+            await store.save_settings(r.chat_id, lambda s: s[key].update(on=on))
         await store.log_action(r.chat_id, r.actor, None, f"{key}-{'on' if on else 'off'}")
         return await reply(m, f"✅ {key.capitalize()} is now <b>{'ON' if on else 'OFF'}</b>.")
     if key == "welcome" and arg[0] == "clean" and len(arg) > 1:

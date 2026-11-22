@@ -97,7 +97,8 @@ def build_dispatcher(ai=None) -> Dispatcher:
                 await gifs.bonus(message, key)
         moderation.set_flair_provider(_flair)
         from handlers.welcome import _switched_off as _greet_off
-        moderation.set_greeting_gate(_greet_off)                  # /welcomemsg off, /leavemsg off also silence the custom moderation greeting
+        from handlers.welcome import set_switched as _greet_set
+        moderation.set_greeting_gate(_greet_off, _greet_set)                  # /welcomemsg off, /leavemsg off also silence the custom moderation greeting
     except Exception:
         log.exception("moderation module failed to load - continuing without it")
     # order matters: admin & game routers first, free-form AI chat last
