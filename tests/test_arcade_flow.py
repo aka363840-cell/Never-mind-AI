@@ -130,6 +130,28 @@ def test_every_new_command_answers_and_buttons_work():
         await h.tap(2, "rp:1:0:r")
         assert h.alerts() and "isn't yours" in h.alerts()[0]
 
+        # --- rock paper scissors vs a player: reply = challenge, both pick in secret, rematch; /rps open lets anyone join
+        out = await h.say(1, "/rps", reply_to=2)
+        assert any("challenged" in t for t in out)
+        gid = h.buttons()[0].split(":")[1]
+        await h.tap(3, f"rpp:{gid}:r")
+        assert h.alerts() and "not in this game" in h.alerts()[0]
+        out = await h.tap(1, f"rpp:{gid}:r")
+        assert any("locked in" in t for t in out) and "Rock" not in out[0]                 # the pick stays secret
+        await h.tap(1, f"rpp:{gid}:p")
+        assert h.alerts() and "already picked" in h.alerts()[0]
+        out = await h.tap(2, f"rpp:{gid}:s")
+        assert "Rock" in out[0] and "Scissors" in out[0] and "User1 wins" in out[0]
+        out = await h.tap(1, f"rpr:{gid}")
+        assert "choosing" in out[0]
+        out = await h.say(1, "/rps open")
+        gid = h.buttons()[0].split(":")[1]
+        assert f"rpj:{gid}" in h.buttons()
+        out = await h.tap(1, f"rpj:{gid}")
+        assert h.alerts() and "Wait for another player" in h.alerts()[0]
+        out = await h.tap(2, f"rpj:{gid}")
+        assert "choosing" in out[0] and f"rpp:{gid}:r" in h.buttons()
+
         # --- tic-tac-toe: open lobby, join, X wins on the top row
         out = await h.say(1, "/ttt")
         gid = h.buttons()[0].split(":")[1]

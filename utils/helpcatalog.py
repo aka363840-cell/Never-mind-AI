@@ -178,7 +178,7 @@ DESC_LIST: list[tuple[str, str]] = [
     ('ttt', '⭕ Tic-tac-toe with a friend'),
     ('achievements', '🏅 Badges & progress'),
     ('clear', '🧹 Make {name} forget our chat'),
-    ('rps', '✊ Rock-paper-scissors'),
+    ('rps', '✊ Rock-paper-scissors vs me - reply to someone (or /rps @name, /rps open) to duel a player, both pick in secret'),
     ('hangman', '🔤 Play hangman'),
     ('tap', '⚡ Fastest Tap: /tap <amount> opens a group lobby (min. 2 players), best of 3 - tap the green button first. /tap free = practice'),
     ('jointap', '⚡ Join the open Fastest Tap lobby in this group'),

@@ -112,7 +112,7 @@ async def solo(uid: int) -> tuple[str, InlineKeyboardMarkup]:
             f"🌟 Reputation <b>{st.get('rep', 0)}</b> · 🎟 Cards <b>{st.get('scratch', 0)}</b> · "
             f"⭕ TTT wins <b>{st.get('ttt_win', 0)}</b>/{st.get('ttt_play', 0)} · 🔤 Hangman wins <b>{st.get('hangman_win', 0)}</b>\n\n"
             f"🎟 /scratch — {arcade.SCRATCH_COST} 💎 card, match 3 to win up to <b>3,000</b>\n"
-            "✊ /rps <i>[bet]</i> — rock-paper-scissors vs me\n"
+            "✊ /rps <i>[bet]</i> — rock-paper-scissors vs me · reply to someone or <code>/rps open</code> to play a friend\n"
             "🔤 /hangman — guess the word, win 💎\n"
             "🧩 /riddle · 💡 /fact · 🔮 /horoscope · 🥠 /fortune\n"
             "🌟 /rep <i>(reply)</i> · /toprep — give respect, climb the board\n"
@@ -211,9 +211,44 @@ def _rps_kb(uid: int, bet: int) -> InlineKeyboardMarkup:
     return kb([[B(text=label, callback_data=f"rp:{uid}:{bet}:{k}") for k, label in arcade.RPS.items()]])
 
 
+# --- rock paper scissors vs another player (reply to them, /rps @name, or /rps open): both pick in secret, free play
+def _rpsp_head(st: dict) -> str:
+    b = mention(st["b"], st["bn"]) if st["b"] else "<i>…waiting for an opponent</i>"
+    return f"✊ <b>Rock · Paper · Scissors</b>\n{mention(st['a'], st['an'])}  vs  {b}"
+
+
+def _rpsp_kb(gid: str, st: dict) -> InlineKeyboardMarkup:
+    if not st["b"]:
+        return kb([[B(text="🎮 Join the game", callback_data=f"rpj:{gid}")]])
+    return kb([[B(text=label, callback_data=f"rpp:{gid}:{k}") for k, label in arcade.RPS.items()]])
+
+
+def _rpsp_wait(st: dict, pa: str = "", pb: str = "") -> str:
+    tick = lambda p: "✅ locked in" if p else "⏳ choosing…"
+    return f"{_rpsp_head(st)}\n\n<i>Both pick in secret 🤫</i>\n{esc(st['an'])}: {tick(pa)}\n{esc(st['bn'])}: {tick(pb)}"
+
+
+async def _rpsp_start(msg: Message, user: User, target: int | None) -> None:
+    st = {"a": user.id, "an": user.first_name, "b": None, "bn": ""}
+    if target:
+        if target == user.id:
+            raise GameError("😅 You can't play against yourself — use <code>/rps</code> to play me, or <code>/rps open</code> for anyone.")
+        st["b"], st["bn"] = target, await _name(target)
+    gid = _gid()
+    await kv.put(f"rpsp:{gid}", json.dumps(st), 1800)
+    tail = (f"\n\n{mention(st['b'], st['bn'])}, you've been challenged! Pick your move:" if st["b"] else "\n\n<i>Anyone can tap Join to play against you.</i>")
+    await _say(msg, _rpsp_head(st) + tail, _rpsp_kb(gid, st))
+
+
 @router.message(Command("rps", "rockpaperscissors"))
 async def rps_cmd(m: Message, command: CommandObject, db_user: User):
     arg = (command.args or "").strip().split()
+    rt = m.reply_to_message
+    if (arg and arg[0].lower() in ("open", "pvp", "vs")) or (arg and arg[0].startswith("@")) or (rt and rt.from_user and not rt.from_user.is_bot and rt.from_user.id != db_user.id):
+        target = None
+        if not (arg and arg[0].lower() in ("open", "pvp", "vs")):
+            target, _ = await resolve_target(m, arg)
+        return await _rpsp_start(m, db_user, target)
     bet = 0
     if arg:
         w = await economy.balance(db_user.id)
@@ -223,6 +258,63 @@ async def rps_cmd(m: Message, command: CommandObject, db_user: User):
     head = (f"✊ <b>Rock · Paper · Scissors</b>\n{mention(db_user.id, db_user.first_name)} vs me — "
             + (f"bet <b>{num(bet)}</b> 💎 (win pays x{arcade.RPS_WIN_MULT}, tie = refund)" if bet else "free practice round"))
     await m.reply(f"{head}\n\n<i>Pick your move:</i>", reply_markup=_rps_kb(db_user.id, bet))
+
+
+@router.callback_query(F.data.startswith("rpj:"))
+async def rpsp_join(cb: CallbackQuery):
+    gid = cb.data.split(":")[1]
+    raw = await kv.get(f"rpsp:{gid}")
+    if not raw:
+        await safe_edit(cb, "⌛ This game expired. Start a new one with /rps")
+        return await safe_answer(cb)
+    st = json.loads(raw)
+    if st["b"]:
+        return await safe_answer(cb, "Someone already joined.", alert=True)
+    if cb.from_user.id == st["a"]:
+        return await safe_answer(cb, "Wait for another player to join 🙂", alert=True)
+    st["b"], st["bn"] = cb.from_user.id, cb.from_user.first_name
+    await kv.put(f"rpsp:{gid}", json.dumps(st), 1800)
+    await safe_edit(cb, _rpsp_wait(st), _rpsp_kb(gid, st))
+    await safe_answer(cb)
+
+
+@router.callback_query(F.data.startswith("rpp:") | F.data.startswith("rpr:"))
+async def rpsp_pick(cb: CallbackQuery):
+    parts = cb.data.split(":")
+    gid, uid = parts[1], cb.from_user.id
+    raw = await kv.get(f"rpsp:{gid}")
+    if not raw:
+        await safe_edit(cb, "⌛ This game expired. Start a new one with /rps")
+        return await safe_answer(cb)
+    st = json.loads(raw)
+    if uid not in (st["a"], st["b"]):
+        return await safe_answer(cb, "You're not in this game. Start your own with /rps ✊", alert=True)
+    ka, kb_ = f"rpsk:{gid}:{st['a']}", f"rpsk:{gid}:{st['b']}"            # one key per player's pick: two simultaneous taps can't overwrite each other
+    if parts[0] == "rpr":                                                 # rematch with the same two players
+        if not (await kv.get(ka) and await kv.get(kb_)):
+            return await safe_answer(cb)
+        await kv.take(ka)
+        await kv.take(kb_)
+        await safe_edit(cb, _rpsp_wait(st), _rpsp_kb(gid, st))
+        return await safe_answer(cb, "Rematch! Pick your move.")
+    pick = parts[2]
+    if pick not in arcade.RPS:
+        return await safe_answer(cb)
+    mine = ka if uid == st["a"] else kb_
+    if not st["b"]:
+        return await safe_answer(cb)
+    if not await kv.set_nx(mine, 1800):
+        return await safe_answer(cb, f"You already picked {arcade.RPS.get(await kv.get(mine), '')} 🔒", alert=True)
+    await kv.put(mine, pick, 1800)
+    pa, pb = await kv.get(ka) or "", await kv.get(kb_) or ""
+    if not (pa in arcade.RPS and pb in arcade.RPS):
+        await safe_edit(cb, _rpsp_wait(st, pa if pa in arcade.RPS else "", pb if pb in arcade.RPS else ""), _rpsp_kb(gid, st))
+        return await safe_answer(cb, f"You picked {arcade.RPS[pick]} 🤫 — waiting for your opponent", alert=True)
+    res = arcade.rps_outcome(pa, pb)
+    verdict = "🤝 <b>Tie!</b>" if res == "tie" else f"🏆 <b>{esc(st['an'] if res == 'win' else st['bn'])} wins!</b>"
+    await safe_edit(cb, f"{_rpsp_head(st)}\n\n{esc(st['an'])}: {arcade.RPS[pa]}\n{esc(st['bn'])}: {arcade.RPS[pb]}\n\n{verdict}",
+                    kb([[B(text="🔁 Rematch", callback_data=f"rpr:{gid}")]]))
+    await safe_answer(cb)
 
 
 @router.callback_query(F.data.startswith("rp:"))
