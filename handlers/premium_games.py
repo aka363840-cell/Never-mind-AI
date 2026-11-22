@@ -17,7 +17,7 @@ router = Router()
 log = logging.getLogger(__name__)
 
 
-@router.message(Command("uno", "ludo", "chess"))
+@router.message(Command("uno", "ludo", "chess", ignore_case=True))
 async def premium_cmd(m: Message, command: CommandObject):
     game, url = command.command.lower(), app_url()
     if not url:
