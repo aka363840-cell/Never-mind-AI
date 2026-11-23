@@ -75,21 +75,36 @@ def test_match_flow_best_of_three():
     assert ms({1: 0}, 1, 1, 1) == ("draw", None) and ms({1: 1}, 1, 1, 1) == ("winner", 1)   # solo practice
 
 
-def test_challenges_get_harder_and_are_always_answerable():
+def test_challenges_vary_and_are_always_answerable():
     from game import speedgames as G
     rng = random.Random(7)
-    seen = set()
-    for r in range(1, 6):
-        for _ in range(40):
-            c = G.make_challenge(r, rng, avoid=seen)
-            assert c.answer >= 1 and c.answer == G.count_for(c.kind, c.word, c.letter)
-            assert c.word.isalpha() and (c.kind != "letter" or c.letter in c.word)
-            if r == 1: assert c.kind == "letters" and 6 <= len(c.word) <= 8
-            if r == 2: assert c.kind == "vowels" and 8 <= len(c.word) <= 10
-            if r == 3: assert c.kind == "letter" and c.letter and 8 <= len(c.word) <= 12
-            if r >= 4: assert c.kind in ("vowels", "consonants", "letter")
-    first = {G.make_challenge(1, rng, avoid=set()).word for _ in range(60)}
-    assert len(first) > 5                                                           # words vary
+    kinds = set()
+    for r in range(1, 7):
+        for _ in range(80):
+            c = G.make_challenge(r, rng, avoid=set())
+            assert 1 <= c.answer <= 999 and c.answer == G.count_for(c.kind, c.word, c.letter)
+            assert c.word.isalpha() and (c.kind not in ("letter", "position") or c.letter in c.word)
+            kinds.add(c.kind)
+            if r == 1: assert c.kind in ("letters", "vowels", "consonants") and 5 <= len(c.word) <= 8
+            if r == 2: assert c.kind in ("vowels", "consonants", "distinct", "letter")
+            if r == 3: assert c.kind in ("letter", "distinct", "repeated", "position")
+    assert kinds == {"letters", "vowels", "consonants", "letter", "distinct", "repeated", "position"}
+    assert G.count_for("position", "ELEPHANT", "P") == 4 and G.count_for("distinct", "ELEPHANT") == 7 and G.count_for("repeated", "ELEPHANT") == 1
+    first = {G.make_challenge(1, rng, avoid=set()).word for _ in range(120)}
+    assert len(first) > 20                                                          # words vary a lot
+
+
+def test_recent_words_are_not_repeated_in_a_chat():
+    from game import speedgames as G
+    from utils.content.speedgames import CRASH_WORDS as W
+    rng = random.Random(3)
+    G._RECENT.clear()
+    seen = []
+    for _ in range(200):
+        c = G.make_challenge(2, rng, avoid=G.recent_words(5))
+        G.remember_word(5, c.word)
+        seen.append(c.word)
+    assert len(set(seen)) == len(seen) and len(W) >= 600
 
 
 def test_tap_timings_and_layout():
@@ -98,6 +113,8 @@ def test_tap_timings_and_layout():
     for _ in range(200):
         assert G.TAP_DELAY[0] <= G.tap_delay(rng) <= G.TAP_DELAY[1]
     assert {G.tap_green(rng) for _ in range(200)} == set(range(G.TAP_BUTTONS))      # the green button really moves around
+    assert [G.tap_count(r) for r in range(1, 7)] == [6, 9, 12, 15, 15, 15]
+    assert {G.tap_green(rng, 15) for _ in range(600)} == set(range(15))
     assert G.reaction(0.4321) == "≈0.43s" and G.reaction(-1) == "≈0.00s"
 
 

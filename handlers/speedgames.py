@@ -41,7 +41,7 @@ DIV = "┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈"
 
 META = {
     "tap": dict(emoji="⚡", title="Fastest Tap", cmd="tap", join="jointap", top="taptop",
-                how="Several buttons appear - only <b>one is green</b> and it moves every round. Tap the green one first! Hit a red one and you're out of the round."),
+                how="A grid of buttons appears (it grows every round) - only <b>one is green</b> and it moves every round. Tap the green one first! Hit a red one and you're out of the round."),
     "crash": dict(emoji="💥", title="Crash Count", cmd="crash", join="joincrash", top="crashtop",
                   how="A word appears as a <b>picture</b> with a question (letters? vowels? one letter?). <b>Type the number</b> in the chat - first correct answer wins the round, one try each."),
 }
@@ -333,10 +333,11 @@ async def _finish(bot: Bot, g: svc.Game, winner: int | None) -> None:
 # ------------------------------------------------------------------ ⚡ Fastest Tap
 def _tap_kb(g: svc.Game, live: bool) -> InlineKeyboardMarkup:
     tail = f"{g.gid}:{g.round_no}"
-    if not live:
-        return kb([[B(text="🔴  wait for green…", callback_data=f"spd:fs:{tail}")]])
-    cells = [B(text="🟢 TAP!", callback_data=f"spd:tap:{tail}") if i == g.green else B(text="🔴", callback_data=f"spd:fs:{tail}") for i in range(G.TAP_BUTTONS)]
-    return kb([cells[:2], cells[2:]])
+    if not live:                                                                       # the whole grid is already there (all red) - tap one now and you're out
+        cells = [B(text="🔴", callback_data=f"spd:fs:{tail}") for _ in range(G.tap_count(g.round_no))]
+        return kb([cells[i:i + G.TAP_COLS] for i in range(0, len(cells), G.TAP_COLS)])
+    cells = [B(text="🟢 TAP!", callback_data=f"spd:tap:{tail}") if i == g.green else B(text="🔴", callback_data=f"spd:fs:{tail}") for i in range(G.tap_count(g.round_no))]
+    return kb([cells[i:i + G.TAP_COLS] for i in range(0, len(cells), G.TAP_COLS)])
 
 
 async def _resolve_none(g: svc.Game, reason: str) -> None:
@@ -357,7 +358,7 @@ async def _tap_round(bot: Bot, g: svc.Game) -> int | None:
     await asyncio.sleep(G.tap_delay())
     async with g.lock:
         if g.phase == "ready":
-            g.green = G.tap_green()
+            g.green = G.tap_green(n=G.tap_count(g.round_no))
             g.phase = "live"
             g.t0 = time.monotonic()
     if g.phase == "live":
@@ -431,8 +432,9 @@ async def tap_button(cb: CallbackQuery, bot: Bot):
 
 # ------------------------------------------------------------------ 💥 Crash Count
 async def _crash_round(bot: Bot, g: svc.Game) -> int | None:
-    ch = G.make_challenge(g.round_no, avoid=g.used)
+    ch = G.make_challenge(g.round_no, avoid=g.used | G.recent_words(g.chat_id))      # no word again in this match, nor in this chat for a long while
     g.used.add(ch.word)
+    G.remember_word(g.chat_id, ch.word)
     g.challenge, g.eliminated, g.reason, g.took = ch, set(), "", 0.0
     loop = asyncio.get_running_loop()
     g.fut = loop.create_future()

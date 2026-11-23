@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import random
 import re
-from collections import Counter
+from collections import Counter, deque
 from dataclasses import dataclass
 
 from game.rules import R
@@ -41,7 +41,9 @@ REMATCH_TTL_S = 600             # the rematch button works this long after a mat
 
 TAP_DELAY = (2.0, 6.0)          # seconds of red "wait" before one button turns green
 TAP_TIMEOUT_S = 12              # nobody tapped within this time -> round without winner
-TAP_BUTTONS = 4                 # 1 green + 3 red decoys (2x2); the green one moves around every round
+TAP_BUTTONS = 6                 # round 1: 1 green + 5 red decoys (3 per row); later rounds open more buttons (see tap_count)
+TAP_COLS = 3
+TAP_MAX_BUTTONS = 15            # 5 rows of 3
 CRASH_INTRO_S = 3               # "get ready" before the picture appears (answers before that are ignored)
 CRASH_TIMEOUT_S = 20            # nobody solved it -> round without winner
 
@@ -102,9 +104,14 @@ def tap_delay(rng: random.Random | None = None) -> float:
     return (rng or random).uniform(*TAP_DELAY)
 
 
-def tap_green(rng: random.Random | None = None) -> int:
-    """Which of the TAP_BUTTONS buttons is the green one this round."""
-    return (rng or random).randrange(TAP_BUTTONS)
+def tap_count(round_no: int) -> int:
+    """More buttons every round: 6, 9, 12, then 15 (the green one is harder to find)."""
+    return min(TAP_MAX_BUTTONS, TAP_BUTTONS + TAP_COLS * (max(1, round_no) - 1))
+
+
+def tap_green(rng: random.Random | None = None, n: int | None = None) -> int:
+    """Which of the n buttons is the green one this round."""
+    return (rng or random).randrange(n or TAP_BUTTONS)
 
 
 def reaction(seconds: float) -> str:
@@ -114,7 +121,7 @@ def reaction(seconds: float) -> str:
 # ------------------------------------------------------------------ 💥 crash
 @dataclass(frozen=True)
 class Challenge:
-    kind: str           # letters | vowels | consonants | letter
+    kind: str           # letters | vowels | consonants | letter | distinct | repeated | position
     word: str
     answer: int
     question: str       # HTML
@@ -135,6 +142,12 @@ def count_for(kind: str, word: str, letter: str = "") -> int:
         return sum(1 for ch in w if ch.isalpha() and ch not in VOWELS)
     if kind == "letter":
         return w.count(letter.upper())
+    if kind == "distinct":                                      # different letters
+        return len(set(ch for ch in w if ch.isalpha()))
+    if kind == "repeated":                                      # letters that show up more than once
+        return sum(1 for n in Counter(w).values() if n >= 2)
+    if kind == "position":                                      # where the letter first appears (1 = first)
+        return w.find(letter.upper()) + 1
     raise ValueError(kind)
 
 
@@ -142,23 +155,44 @@ def _question(kind: str, letter: str) -> str:
     return {"letters": "How many <b>letters</b> does the word have?",
             "vowels": "How many <b>vowels</b> (A E I O U) does it have?",
             "consonants": "How many <b>consonants</b> does it have?",
-            "letter": f"How many times does the letter <b>{letter}</b> appear?"}[kind]
+            "letter": f"How many times does the letter <b>{letter}</b> appear?",
+            "distinct": "How many <b>different letters</b> does it use? (a repeated letter counts once)",
+            "repeated": "How many letters appear <b>more than once</b>?",
+            "position": f"At which position does the letter <b>{letter}</b> <b>first</b> appear? (1 = first letter)"}[kind]
 
 
-_PLAN = {1: ("letters", (6, 8)), 2: ("vowels", (8, 10)), 3: ("letter", (8, 12))}      # rising difficulty; later (tie-break) rounds are random + long
+# difficulty rises with the round; the kind and the word are picked at random inside each tier so nobody can predict the next question
+_TIERS = {1: (("letters", "vowels", "consonants"), (5, 8)),
+          2: (("vowels", "consonants", "distinct", "letter"), (7, 10)),
+          3: (("letter", "distinct", "repeated", "position"), (8, 12))}
+_ANY = ("vowels", "consonants", "letter", "distinct", "repeated", "position")      # later (tie-break) rounds: everything, long words
+_RECENT: dict[int, deque] = {}
+RECENT_KEEP = 300               # words a chat will not see again until this many others were used
+
+
+def recent_words(chat_id: int) -> frozenset[str]:
+    return frozenset(_RECENT.get(chat_id, ()))
+
+
+def remember_word(chat_id: int, word: str) -> None:
+    _RECENT.setdefault(chat_id, deque(maxlen=RECENT_KEEP)).append(word)
 
 
 def make_challenge(round_no: int, rng: random.Random | None = None, avoid: set[str] | frozenset[str] = frozenset()) -> Challenge:
     rng = rng or random
-    kind, (lo, hi) = _PLAN.get(round_no) or (rng.choice(("vowels", "consonants", "letter")), (9, 12))
-    pool = [w for w in CRASH_WORDS if lo <= len(w) <= hi and w not in avoid] or [w for w in CRASH_WORDS if w not in avoid] or list(CRASH_WORDS)
-    word = rng.choice(pool)
-    letter = ""
-    if kind == "letter":
-        counts = Counter(word)
-        many = sorted(c for c, n in counts.items() if n >= 2)
-        letter = rng.choice(many or sorted(counts))
-    return Challenge(kind, word, count_for(kind, word, letter), _question(kind, letter), letter)
+    kinds, (lo, hi) = _TIERS.get(round_no) or (_ANY, (9, 14))
+    for _ in range(30):                                          # a kind that has no answer for the word (e.g. no repeated letter) is simply re-rolled
+        kind = rng.choice(kinds)
+        pool = [w for w in CRASH_WORDS if lo <= len(w) <= hi and w not in avoid] or [w for w in CRASH_WORDS if w not in avoid] or list(CRASH_WORDS)
+        word = rng.choice(pool)
+        letter = ""
+        if kind in ("letter", "position"):
+            counts = Counter(word)
+            many = sorted(c for c, n in counts.items() if n >= 2)
+            letter = rng.choice(many if kind == "letter" and many else sorted(counts))
+        if count_for(kind, word, letter) >= 1:
+            return Challenge(kind, word, count_for(kind, word, letter), _question(kind, letter), letter)
+    return Challenge("letters", word, letter_count(word), _question("letters", ""), "")
 
 
 def parse_number(text: str | None) -> int | None:
