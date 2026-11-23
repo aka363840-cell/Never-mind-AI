@@ -10,6 +10,7 @@ import re
 import shutil
 
 log = logging.getLogger(__name__)
+last_error = ""        # why the last synth() failed; shown to the owner so a silent fallback to text is explainable
 MAX_CHARS = 1500
 VOICES = {   # short name -> (edge voice id, what it is)
     "neerja": ("en-IN-NeerjaNeural", "Indian English, woman (best for Hinglish text)"),
@@ -61,15 +62,20 @@ async def _mp3(text: str, voice: str) -> bytes:
 
 async def synth(text: str, voice: str = "") -> tuple[bytes, bool] | None:
     """Returns (audio, is_voice_note). is_voice_note False means MP3 (send as an audio file). None = could not speak."""
+    global last_error
+    last_error = ""
     text = clean(text)
     if not text or len(text) > MAX_CHARS:            # too long to speak in one go: caller keeps the text reply
+        last_error = "answer too long or empty for voice"
         return None
     try:
         mp3 = await asyncio.wait_for(_mp3(text, voice_id(voice)), 30)
-    except Exception:
+    except Exception as e:
+        last_error = f"{type(e).__name__}: {e}"[:200]
         log.warning("edge-tts failed", exc_info=True)
         return None
     if not mp3:
+        last_error = "edge-tts returned no audio"
         return None
     ogg = await _opus(mp3)
     return (ogg, True) if ogg else (mp3, False)

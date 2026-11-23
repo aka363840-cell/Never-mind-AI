@@ -157,6 +157,7 @@ async def _speak(m: Message, answer: str) -> bool:
             return False
         out = await tts.synth(answer, (await kv.get(VOICE_NAME_KEY)) or "")
         if not out:
+            await m.reply(f"⚠️ Voice failed, sending text instead: {tts.last_error}", parse_mode=None)
             return False
         data, note = out
         if note:
