@@ -172,7 +172,8 @@ function homeSections(d) {
   if (d.recent.length) out.push(section("Continue playing", rail(d.recent, "sm")));
   out.push(section("Categories", h("div", { class: "cats" }, d.categories.filter((c) => c.count > 0).map((c) =>
     h("button", { class: "cat", onclick: () => goGames({ category: c.id }) }, h("span", { class: "ico" }, icon(c.icon)), h("span", { class: "txt" }, h("b", {}, c.name), h("small", {}, `${c.count} games`)))))));
-  if (d.popular.length) out.push(section("Popular", rail(d.popular, "sm"), h("button", { onclick: () => goGames({}) }, "All games")));
+  if (d.popular.length) out.push(section("Popular", rail(d.popular, "sm"), h("button", { onclick: () => goGames({}) }, `All ${d.total_games} games`)));
+  (d.rails || []).forEach((r) => out.push(section(r.name, rail(r.items, "sm"), h("button", { onclick: () => goGames({ category: r.id }) }, `See all ${r.count}`))));
   out.push(section("Favourites", d.favorites.length ? rail(d.favorites, "sm")
     : h("div", { class: "empty-card" }, icon("heart"), h("span", {}, "Tap the heart on any game to keep it here."))));
   if (!d.total_games) out.push(stateBox("sparkle", "No games yet", "The catalogue is still being checked. Try again in a minute."));

@@ -6,6 +6,7 @@ import contextlib
 import logging
 import re
 import sys
+import random
 import time
 from datetime import datetime
 
@@ -182,15 +183,22 @@ async def home(request: Request):
     cat, db = _loaded(request), request.app.state.db
     pop = await db.popularity()
     if sum(pop.values()) > 0:
-        popular = cat.search(sort="popular", popularity=pop)[:12]
+        popular = cat.search(sort="popular", popularity=pop)[:20]
     else:
-        popular = cat.featured(12, day=int(time.time() // 86400) + 1000)
+        popular = cat.featured(20, day=int(time.time() // 86400) + 1000)
     favs = await db.favorites(uid)
     recent = await db.recent(uid, 12)
     sc: Scanner = request.app.state.scanner
     counts = cat.counts()
+    day_rng = random.Random(int(time.time() // 86400))                    # the same shuffle all day, a fresh one tomorrow
+    rails = []
+    for c in sorted(categories.CATEGORIES, key=lambda c: -counts[c["id"]]):
+        slugs = cat.search(category=c["id"])
+        if len(slugs) >= 6 and len(rails) < 8:
+            rails.append({"id": c["id"], "name": c["name"], "count": counts[c["id"]], "items": [cat.card(x) for x in day_rng.sample(slugs, min(14, len(slugs)))]})
     return JSONResponse({
-        "featured": [cat.card(s) for s in cat.featured(8)],
+        "rails": rails,
+        "featured": [cat.card(s) for s in cat.featured(12)],
         "popular": [cat.card(s) for s in popular],
         "recent": cards(cat, [r["slug"] for r in recent])[:12],
         "favorites": cards(cat, favs)[:12], "favorite_slugs": favs,
