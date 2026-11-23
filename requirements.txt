@@ -7,3 +7,4 @@ Pillow>=10.0
 asyncpg>=0.29
 redis>=5.0
 telethon>=1.36
+edge-tts>=6.1

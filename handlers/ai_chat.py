@@ -118,10 +118,10 @@ VOICE_TTL = 3650 * 86400
 
 
 def _voice_help(on: bool, name: str) -> str:
-    lst = ", ".join(f"<code>{k}</code>" for k in tts.VOICES)
+    lst = "\n".join(f"<code>{k}</code> - {d}" for k, (_, d) in tts.VOICES.items())
     return (f"🎙 Voice mode: <b>{'ON - I reply with voice only' if on else 'OFF'}</b>\nVoice: <b>{name}</b>\n\n"
             f"<code>/voice on</code> · <code>/voice off</code> · <code>/voice &lt;name&gt;</code>\n"
-            f"Voices: {lst}\n<i>Owner only. Very long answers still come as text.</i>")
+            f"Voices:\n{lst}\n\n<i>Owner only. Very long answers still come as text.</i>")
 
 
 @router.message(Command("voice"))
@@ -136,18 +136,18 @@ async def voice_cmd(m: Message, command: CommandObject, bot: Bot):
     elif arg in tts.VOICES:
         await kv.put(VOICE_NAME_KEY, arg, VOICE_TTL)
         await kv.put(VOICE_KEY, "on", VOICE_TTL)
-        out = await tts.synth("Hi, main Ella hoon. Ab main isi awaaz mein baat karungi.", get_settings().gemini_api_keys, arg)
+        out = await tts.synth("Hi, main Ella hoon. Ab main isi awaaz mein baat karungi.", arg)
         if out:
             data, note = out
             if note:
                 await m.reply_voice(BufferedInputFile(data, "ella.ogg"))
             else:
-                await m.reply_audio(BufferedInputFile(data, "ella.wav"), title=arg)
+                await m.reply_audio(BufferedInputFile(data, "ella.mp3"), title=arg)
     elif arg:
         await m.reply("❌ Unknown voice. Send <code>/voice</code> to see the list.")
         return
     on = (await kv.get(VOICE_KEY)) == "on"
-    await m.reply(_voice_help(on, (await kv.get(VOICE_NAME_KEY)) or tts.VOICE.lower()))
+    await m.reply(_voice_help(on, (await kv.get(VOICE_NAME_KEY)) or tts.DEFAULT))
 
 
 async def _speak(m: Message, answer: str) -> bool:
@@ -155,14 +155,14 @@ async def _speak(m: Message, answer: str) -> bool:
     try:
         if not m.from_user or m.from_user.id != get_settings().owner_id or (await kv.get(VOICE_KEY)) != "on":
             return False
-        out = await tts.synth(answer, get_settings().gemini_api_keys, (await kv.get(VOICE_NAME_KEY)) or "")
+        out = await tts.synth(answer, (await kv.get(VOICE_NAME_KEY)) or "")
         if not out:
             return False
         data, note = out
         if note:
             await m.reply_voice(BufferedInputFile(data, "ella.ogg"))
         else:
-            await m.reply_audio(BufferedInputFile(data, "ella.wav"), title="Ella")
+            await m.reply_audio(BufferedInputFile(data, "ella.mp3"), title="Ella")
         return True
     except Exception:
         log.warning("voice reply failed", exc_info=True)
