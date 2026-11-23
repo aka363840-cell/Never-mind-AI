@@ -169,6 +169,7 @@ function homeSections(d) {
   const out = [];
   if (d.verifying) out.push(h("div", { class: "notice section" }, `Checking games for ads - ${d.verifying} left. More games appear as they pass.`));
   if (d.featured.length) out.push(section("Featured", rail(d.featured, "feat")));
+  if (d.total_games) out.push(h("button", { class: "browse", onclick: () => goGames({}) }, h("span", { class: "txt" }, h("b", {}, `Browse all ${d.total_games} games`), h("small", {}, "Search or filter by category")), icon("sparkle")));
   if (d.recent.length) out.push(section("Continue playing", rail(d.recent, "sm")));
   out.push(section("Categories", h("div", { class: "cats" }, d.categories.filter((c) => c.count > 0).map((c) =>
     h("button", { class: "cat", onclick: () => goGames({ category: c.id }) }, h("span", { class: "ico" }, icon(c.icon)), h("span", { class: "txt" }, h("b", {}, c.name), h("small", {}, `${c.count} games`)))))));
