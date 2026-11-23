@@ -13,6 +13,8 @@ from aiogram.utils.chat_action import ChatActionSender
 from ai.gemini import BLOCKED_REPLY
 from ai.base import AIQuotaExceeded, AIRateLimited, AIUnavailable
 from ai.service import ChatService
+from ai import tts
+from aiogram.types import BufferedInputFile
 from config import get_settings
 from database.session import db
 from handlers import admin as admin_h
@@ -108,6 +110,39 @@ async def clear_cmd(m: Message, ai: ChatService | None):
     if ai:
         await ai.clear(m.from_user.id, m.chat.id)
     await m.reply("🧹 Done — I've forgotten our chat. Fresh start! 🦋")
+
+
+VOICE_KEY = "voice:owner"
+VOICE_TTL = 3650 * 86400
+
+
+@router.message(Command("voice"))
+async def voice_cmd(m: Message, command: CommandObject):
+    """Owner-only: Ella also speaks her AI replies as a voice note. /voice on | off."""
+    if not m.from_user or m.from_user.id != get_settings().owner_id:
+        return
+    arg = (command.args or "").strip().lower()
+    if arg in ("on", "off"):
+        await kv.put(VOICE_KEY, arg, VOICE_TTL)
+    on = (await kv.get(VOICE_KEY)) == "on"
+    await m.reply(f"🎙 Voice replies: <b>{'ON' if on else 'OFF'}</b> (owner only). Use <code>/voice on</code> or <code>/voice off</code>.")
+
+
+async def _speak(m: Message, answer: str) -> None:
+    """Owner-only extra: after the text reply, send the same answer as a voice note. Never raises; on any failure the text stays."""
+    try:
+        if not m.from_user or m.from_user.id != get_settings().owner_id or (await kv.get(VOICE_KEY)) != "on":
+            return
+        out = await tts.synth(answer, get_settings().gemini_api_keys)
+        if not out:
+            return
+        data, note = out
+        if note:
+            await m.reply_voice(BufferedInputFile(data, "ella.ogg"))
+        else:
+            await m.reply_audio(BufferedInputFile(data, "ella.wav"), title="Ella")
+    except Exception:
+        log.warning("voice reply failed", exc_info=True)
 
 
 @router.message(Command("aitest"))
@@ -223,6 +258,8 @@ async def _talk(m: Message, bot: Bot, ai: ChatService | None, text: str,
         answer = "🙈 Let's keep the stickers fun and clean here, please! 🦋"
     for part in split_text(answer):
         await _send(m, part, expire=sticker, parse_mode=None)       # model output is untrusted: send as plain text
+    if not sticker:
+        await _speak(m, answer)
 
 
 @router.message(Command("ask", "chat", "bot"))
