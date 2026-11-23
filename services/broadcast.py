@@ -53,6 +53,8 @@ async def _send_one(bot: Bot, chat_id: int, p: dict) -> str:
         try:
             if p.get("probe"):
                 await bot.send_chat_action(chat_id, "typing")      # invisible: nothing appears in their chat
+            elif p.get("src_msg") and p.get("forward"):
+                await bot.forward_message(chat_id, p["src_chat"], p["src_msg"])      # keeps the "Forwarded from Ella" header (tappable)
             elif p.get("src_msg"):
                 await bot.copy_message(chat_id, p["src_chat"], p["src_msg"])
             else:

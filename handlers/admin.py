@@ -52,7 +52,7 @@ async def _ask(m: Message, action: str, args: dict, summary: str):
 async def admin_help(m: Message):
     await m.reply("🔧 <b>Admin</b> (" + adm.role(m.from_user.id) + ")\n/give /take /setbalance &lt;target&gt; &lt;amount&gt;\n/resetdiamonds &lt;amount&gt; (everyone's wallet = amount, owner)\n"
                   "/ban &lt;target&gt; [reason] · /unban · /mute · /unmute  (owner: no slash needed — reply with \"ban\" / \"mute\" / \"unban\")\n/userinfo &lt;target&gt; · /logs [n]\n"
-                  "/broadcast &lt;text&gt; · /syncusers · /maintenance on|off · /stats · /backupdb · /restoredb · /emojiid · /seticon · /delicon · /aitest (owner) · /drop · /boss (in groups)\n\nTarget = reply, @user or ID. Works in DM and in groups. State changes need a confirm tap.")
+                  "/broadcast [forward] &lt;text&gt; · /syncusers · /maintenance on|off · /stats · /backupdb · /restoredb · /emojiid · /seticon · /delicon · /aitest (owner) · /drop · /boss (in groups)\n\nTarget = reply, @user or ID. Works in DM and in groups. State changes need a confirm tap.")
 
 
 @router.message(Command("stats"))
@@ -225,15 +225,19 @@ async def maintenance(m: Message, command: CommandObject):
 @router.message(Command("broadcast"))
 async def broadcast(m: Message, command: CommandObject):
     """/broadcast <text> · or REPLY to any message (photo, video, sticker, voice, file, poll...) with /broadcast.
-    Optional first word: users | groups | all (default all)."""
+    Optional words: users | groups | all (default all) and 'forward' (reply mode: keeps the tappable "Forwarded from" header)."""
     from services import broadcast as bc
     args, scope = (command.args or "").strip(), "all"
-    first, _, rest = args.partition(" ")
-    if first.lower() in ("users", "groups", "all"):
-        scope, args = first.lower(), rest.strip()
+    fwd = False
+    for _ in range(2):                                   # options in any order: users|groups|all  and  forward
+        first, _, rest = args.partition(" ")
+        if first.lower() in ("users", "groups", "all"):
+            scope, args = first.lower(), rest.strip()
+        elif first.lower() in ("forward", "fwd"):
+            fwd, args = True, rest.strip()
     rep = m.reply_to_message
     if rep is not None:
-        payload = {"src_chat": rep.chat.id, "src_msg": rep.message_id}
+        payload = {"src_chat": rep.chat.id, "src_msg": rep.message_id, **({"forward": True} if fwd else {})}
         what = f"that <b>{esc(str(rep.content_type.value if hasattr(rep.content_type, 'value') else rep.content_type))}</b> message"
     elif args:
         payload = {"text": args[:4000]}
