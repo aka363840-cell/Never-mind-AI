@@ -14,6 +14,7 @@ from ai.gemini import BLOCKED_REPLY
 from ai.base import AIQuotaExceeded, AIRateLimited, AIUnavailable
 from ai.service import ChatService
 from ai import tts
+from services import voiceaccess as voice_access
 from aiogram.types import BufferedInputFile
 from config import get_settings
 from database.session import db
@@ -112,58 +113,91 @@ async def clear_cmd(m: Message, ai: ChatService | None):
     await m.reply("🧹 Done — I've forgotten our chat. Fresh start! 🦋")
 
 
-VOICE_KEY = "voice:owner"
-VOICE_NAME_KEY = "voice:name"
-VOICE_TTL = 3650 * 86400
+def _voice_ok(uid: int) -> bool:
+    return voice_access.allowed(uid, get_settings().owner_id)
 
 
 def _voice_help(on: bool, name: str) -> str:
     lst = "\n".join(f"<code>{k}</code> - {d}" for k, (_, d) in tts.VOICES.items())
     return (f"🎙 Voice mode: <b>{'ON - I reply with voice only' if on else 'OFF'}</b>\nVoice: <b>{name}</b>\n\n"
             f"<code>/voice on</code> · <code>/voice off</code> · <code>/voice &lt;name&gt;</code>\n"
-            f"Voices:\n{lst}\n\n<i>Owner only. Very long answers still come as text.</i>")
+            f"Voices:\n{lst}\n\n<i>Very long answers still come as text.</i>")
+
+
+async def _send_audio(m: Message, data: bytes, note: bool, title: str = "Ella") -> None:
+    if note:
+        await m.reply_voice(BufferedInputFile(data, "ella.ogg"))
+    else:
+        await m.reply_audio(BufferedInputFile(data, "ella.mp3"), title=title)
 
 
 @router.message(Command("voice"))
-async def voice_cmd(m: Message, command: CommandObject, bot: Bot):
-    """Owner-only: while ON, AI replies come as a voice note INSTEAD of text, until /voice off."""
-    if not m.from_user or m.from_user.id != get_settings().owner_id:
+async def voice_cmd(m: Message, command: CommandObject):
+    """Owner and people the owner approved: while ON, AI replies to YOU come as a voice note instead of text, until /voice off."""
+    if not m.from_user or not _voice_ok(m.from_user.id):
         return
+    uid = m.from_user.id
     arg = (command.args or "").strip().lower().split()[:1]
     arg = arg[0] if arg else ""
     if arg in ("on", "off"):
-        await kv.put(VOICE_KEY, arg, VOICE_TTL)
+        voice_access.set_prefs(uid, on=arg == "on")
     elif arg in tts.VOICES:
-        await kv.put(VOICE_NAME_KEY, arg, VOICE_TTL)
-        await kv.put(VOICE_KEY, "on", VOICE_TTL)
+        voice_access.set_prefs(uid, on=True, name=arg)
         out = await tts.synth("Hi, main Ella hoon. Ab main isi awaaz mein baat karungi.", arg)
         if out:
-            data, note = out
-            if note:
-                await m.reply_voice(BufferedInputFile(data, "ella.ogg"))
-            else:
-                await m.reply_audio(BufferedInputFile(data, "ella.mp3"), title=arg)
+            await _send_audio(m, out[0], out[1], arg)
     elif arg:
         await m.reply("❌ Unknown voice. Send <code>/voice</code> to see the list.")
         return
-    on = (await kv.get(VOICE_KEY)) == "on"
-    await m.reply(_voice_help(on, (await kv.get(VOICE_NAME_KEY)) or tts.DEFAULT))
+    on, name = voice_access.prefs(uid)
+    await m.reply(_voice_help(on, name or tts.DEFAULT))
+
+
+async def _voice_target(m: Message, command: CommandObject) -> int | None:
+    toks = [t for t in (command.args or "").split() if t.startswith("@") or t.isdigit()]
+    target, _ = await resolve_target(m, toks)
+    return target
+
+
+@router.message(Command("approvevoice"))
+async def approvevoice_cmd(m: Message, command: CommandObject):
+    """Owner only: let someone use voice replies. Reply to them, or give @username / numeric id."""
+    if not m.from_user or m.from_user.id != get_settings().owner_id:
+        return
+    t = await _voice_target(m, command)
+    if t is None:
+        await m.reply("Who? Reply to their message, or write <code>/approvevoice @username</code> / numeric ID.")
+        return
+    msg = "✅ Voice access given." if voice_access.approve(t) else "They already have voice access."
+    await m.reply(f"{msg} They can now use <code>/voice</code>. ID: <code>{t}</code>")
+
+
+@router.message(Command("removevoice"))
+async def removevoice_cmd(m: Message, command: CommandObject):
+    """Owner only: take voice access away again."""
+    if not m.from_user or m.from_user.id != get_settings().owner_id:
+        return
+    t = await _voice_target(m, command)
+    if t is None:
+        ids = voice_access.approved_ids()
+        await m.reply("Who? Reply to their message or give @username / ID.\nApproved now: " + (", ".join(f"<code>{i}</code>" for i in ids) or "nobody"))
+        return
+    await m.reply("🗑 Voice access removed." if voice_access.remove(t) else "They didn't have voice access.")
 
 
 async def _speak(m: Message, answer: str) -> bool:
-    """Owner voice mode: send the answer as a voice note. True = sent (skip the text). Never raises; any failure -> False (text goes out)."""
+    """Voice mode: send the answer as a voice note. True = sent (skip the text). Never raises; any failure -> False (text goes out)."""
     try:
-        if not m.from_user or m.from_user.id != get_settings().owner_id or (await kv.get(VOICE_KEY)) != "on":
+        if not m.from_user or not _voice_ok(m.from_user.id):
             return False
-        out = await tts.synth(answer, (await kv.get(VOICE_NAME_KEY)) or "")
+        on, name = voice_access.prefs(m.from_user.id)
+        if not on:
+            return False
+        out = await tts.synth(answer, name)
         if not out:
             await m.reply(f"⚠️ Voice failed, sending text instead: {tts.last_error}", parse_mode=None)
             return False
-        data, note = out
-        if note:
-            await m.reply_voice(BufferedInputFile(data, "ella.ogg"))
-        else:
-            await m.reply_audio(BufferedInputFile(data, "ella.mp3"), title="Ella")
+        await _send_audio(m, out[0], out[1])
         return True
     except Exception:
         log.warning("voice reply failed", exc_info=True)
