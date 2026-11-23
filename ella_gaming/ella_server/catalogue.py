@@ -167,12 +167,20 @@ class Catalogue:
         self.verdicts = rows
         self._bump()
 
+    def _hard_blocked(self, slug: str) -> bool:
+        """Only a provider's own frame ban hides a game. A scan that hit http-403/429/redirect (often our server's IP being
+        rate-limited, not the game being broken) must not hide hundreds of working games."""
+        v = self.verdicts.get(slug) or {}
+        if v.get("verdict") != "blocked":
+            return False
+        return any(r.startswith(("x-frame-options", "csp-frame-ancestors")) for r in v.get("reasons", []))
+
     def is_eligible(self, slug: str) -> bool:
         if slug not in self.games:
             return False
         v = self.verdicts.get(slug, {}).get("verdict")
         if self.st.ads_policy == "show_all":      # list every embeddable game, ads or not (games may show provider ads)
-            return v != "blocked"
+            return not self._hard_blocked(slug)
         if self.st.ads_policy == "trust_provider":
             return v not in ("ads", "blocked")
         return v == "clean"
