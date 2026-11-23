@@ -20,14 +20,28 @@ log = logging.getLogger(__name__)
 URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 MODEL = os.getenv("GEMINI_TTS_MODEL", "gemini-2.5-flash-preview-tts").strip()
 VOICE = os.getenv("GEMINI_TTS_VOICE", "Kore").strip()
-MAX_CHARS = 700
+MAX_CHARS = 1200
+VOICES = {   # Gemini prebuilt voices (name -> feel). All work with Hindi / Hinglish text.
+    "kore": "firm", "puck": "upbeat", "charon": "calm, informative", "zephyr": "bright", "aoede": "breezy",
+    "leda": "youthful", "fenrir": "excitable", "orus": "firm, deep", "achird": "friendly", "sulafat": "warm",
+    "vindemiatrix": "gentle", "algieba": "smooth", "gacrux": "mature", "zubenelgenubi": "casual",
+}
 _EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿️‍]")
 _MD = re.compile(r"[*_`#>~]|\[|\]|https?://\S+")
 
 
-def clean(text: str) -> str:
+def voice_name(v: str) -> str:
+    v = (v or "").strip().lower()
+    return v.capitalize() if v in VOICES else VOICE
+
+
+def clean_full(text: str) -> str:
     t = _MD.sub(" ", _EMOJI.sub(" ", text or ""))
-    return re.sub(r"\s+", " ", t).strip()[:MAX_CHARS]
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def clean(text: str) -> str:
+    return clean_full(text)[:MAX_CHARS]
 
 
 def wav(pcm: bytes, rate: int = 24000) -> bytes:
@@ -54,14 +68,16 @@ async def _opus(wav_bytes: bytes) -> bytes | None:
         return None
 
 
-async def synth(text: str, keys: tuple[str, ...]) -> tuple[bytes, bool] | None:
+async def synth(text: str, keys: tuple[str, ...], voice: str = "") -> tuple[bytes, bool] | None:
     """Returns (audio, is_voice_note). is_voice_note False means WAV (send as audio file). None = could not speak."""
+    if len(clean_full(text)) > MAX_CHARS:     # too long to speak in one go: caller keeps the text reply
+        return None
     text = clean(text)
     if not text or not keys:
         return None
     body = {"contents": [{"parts": [{"text": text}]}],
             "generationConfig": {"responseModalities": ["AUDIO"],
-                                 "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": VOICE}}}}}
+                                 "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice_name(voice)}}}}}
     pcm = None
     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=25)) as s:
         for k in keys:

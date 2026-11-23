@@ -113,36 +113,60 @@ async def clear_cmd(m: Message, ai: ChatService | None):
 
 
 VOICE_KEY = "voice:owner"
+VOICE_NAME_KEY = "voice:name"
 VOICE_TTL = 3650 * 86400
 
 
+def _voice_help(on: bool, name: str) -> str:
+    lst = ", ".join(f"<code>{k}</code>" for k in tts.VOICES)
+    return (f"🎙 Voice mode: <b>{'ON - I reply with voice only' if on else 'OFF'}</b>\nVoice: <b>{name}</b>\n\n"
+            f"<code>/voice on</code> · <code>/voice off</code> · <code>/voice &lt;name&gt;</code>\n"
+            f"Voices: {lst}\n<i>Owner only. Very long answers still come as text.</i>")
+
+
 @router.message(Command("voice"))
-async def voice_cmd(m: Message, command: CommandObject):
-    """Owner-only: Ella also speaks her AI replies as a voice note. /voice on | off."""
+async def voice_cmd(m: Message, command: CommandObject, bot: Bot):
+    """Owner-only: while ON, AI replies come as a voice note INSTEAD of text, until /voice off."""
     if not m.from_user or m.from_user.id != get_settings().owner_id:
         return
-    arg = (command.args or "").strip().lower()
+    arg = (command.args or "").strip().lower().split()[:1]
+    arg = arg[0] if arg else ""
     if arg in ("on", "off"):
         await kv.put(VOICE_KEY, arg, VOICE_TTL)
+    elif arg in tts.VOICES:
+        await kv.put(VOICE_NAME_KEY, arg, VOICE_TTL)
+        await kv.put(VOICE_KEY, "on", VOICE_TTL)
+        out = await tts.synth("Hi, main Ella hoon. Ab main isi awaaz mein baat karungi.", get_settings().gemini_api_keys, arg)
+        if out:
+            data, note = out
+            if note:
+                await m.reply_voice(BufferedInputFile(data, "ella.ogg"))
+            else:
+                await m.reply_audio(BufferedInputFile(data, "ella.wav"), title=arg)
+    elif arg:
+        await m.reply("❌ Unknown voice. Send <code>/voice</code> to see the list.")
+        return
     on = (await kv.get(VOICE_KEY)) == "on"
-    await m.reply(f"🎙 Voice replies: <b>{'ON' if on else 'OFF'}</b> (owner only). Use <code>/voice on</code> or <code>/voice off</code>.")
+    await m.reply(_voice_help(on, (await kv.get(VOICE_NAME_KEY)) or tts.VOICE.lower()))
 
 
-async def _speak(m: Message, answer: str) -> None:
-    """Owner-only extra: after the text reply, send the same answer as a voice note. Never raises; on any failure the text stays."""
+async def _speak(m: Message, answer: str) -> bool:
+    """Owner voice mode: send the answer as a voice note. True = sent (skip the text). Never raises; any failure -> False (text goes out)."""
     try:
         if not m.from_user or m.from_user.id != get_settings().owner_id or (await kv.get(VOICE_KEY)) != "on":
-            return
-        out = await tts.synth(answer, get_settings().gemini_api_keys)
+            return False
+        out = await tts.synth(answer, get_settings().gemini_api_keys, (await kv.get(VOICE_NAME_KEY)) or "")
         if not out:
-            return
+            return False
         data, note = out
         if note:
             await m.reply_voice(BufferedInputFile(data, "ella.ogg"))
         else:
             await m.reply_audio(BufferedInputFile(data, "ella.wav"), title="Ella")
+        return True
     except Exception:
         log.warning("voice reply failed", exc_info=True)
+        return False
 
 
 @router.message(Command("aitest"))
@@ -256,10 +280,10 @@ async def _talk(m: Message, bot: Bot, ai: ChatService | None, text: str,
         return
     if sticker and answer.strip() == BLOCKED_REPLY:    # the AI's safety filter refused the picture (nudity etc.)
         answer = "🙈 Let's keep the stickers fun and clean here, please! 🦋"
+    if not sticker and await _speak(m, answer):     # owner voice mode: voice instead of text
+        return
     for part in split_text(answer):
         await _send(m, part, expire=sticker, parse_mode=None)       # model output is untrusted: send as plain text
-    if not sticker:
-        await _speak(m, answer)
 
 
 @router.message(Command("ask", "chat", "bot"))
