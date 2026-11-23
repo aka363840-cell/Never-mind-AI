@@ -171,6 +171,9 @@ WORDS: dict[str, list[str]] = {
     "💻 Tech": ["KEYBOARD", "TELEGRAM", "INTERNET", "SMARTPHONE", "ALGORITHM", "BROWSER", "PASSWORD", "ROBOT", "SATELLITE", "BLUETOOTH", "CAMERA", "PROGRAM"],
     "⚽ Sport": ["CRICKET", "FOOTBALL", "BADMINTON", "HOCKEY", "TENNIS", "BASKETBALL", "SWIMMING", "WRESTLING", "ARCHERY", "MARATHON", "KABADDI", "VOLLEYBALL"],
 }
+from utils.content.pack2 import HANGMAN as _MORE_HANG, merge_dict as _merge_dict  # noqa: E402
+
+WORDS = _merge_dict(WORDS, _MORE_HANG)
 ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 

@@ -70,3 +70,7 @@ QUESTIONS_MORE: list[tuple[str, list[str], int]] = [
     ("Which Indian state is known as the Land of Five Rivers?", ["Punjab", "Haryana", "Gujarat", "Bihar"], 0),
     ("What is the name of the Moon mission by India that landed near the south pole in 2023?", ["Chandrayaan-3", "Mangalyaan", "Gaganyaan", "Aditya-L1"], 0),
 ]
+
+from .pack2 import TRIVIA as _T, merge as _merge  # noqa: E402
+
+QUESTIONS_MORE = _merge(QUESTIONS_MORE, _T)

@@ -133,3 +133,14 @@ GOODBYE_MORE = [
     "💔 Aww, {n} left <b>{g}</b>. We'll keep your seat warm", "🛫 {n} took off from <b>{g}</b>. Fly high!",
     "🌙 Goodbye {n}! <b>{g}</b> won't be the same without you", "🕊 {n} has left the group. Take care out there!",
 ]
+
+from . import pack2 as _p  # noqa: E402
+
+WELCOME_MORE = _p.merge(WELCOME_MORE, _p.WELCOME)
+GOODBYE_MORE = _p.merge(GOODBYE_MORE, _p.GOODBYE)
+TRUTH_MORE = _p.merge(TRUTH_MORE, _p.TRUTH)
+DARE_MORE = _p.merge(DARE_MORE, _p.DARE)
+JOKES_MORE = _p.merge(JOKES_MORE, _p.JOKES)
+COMPLIMENTS_MORE = _p.merge(COMPLIMENTS_MORE, _p.COMPLIMENTS)
+ROASTS_MORE = _p.merge(ROASTS_MORE, _p.ROASTS)
+BALL_MORE = _p.merge(BALL_MORE, _p.BALL)

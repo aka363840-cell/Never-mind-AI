@@ -82,3 +82,15 @@ MINE_EXTRA = {
     "💠 You struck a sapphire": ["💠 You found a deep-blue sapphire", "❤️ You dug out a ruby the size of a coin"],
     "💎 You unearthed a raw diamond": ["💎 You pulled out a flawless raw diamond", "💎 You cracked open a geode full of diamonds"],
 }
+
+from . import pack2 as _p  # noqa: E402
+
+WORK_MORE = _p.merge(WORK_MORE, _p.WORK)
+CRIME_WIN_MORE = _p.merge(CRIME_WIN_MORE, _p.CRIME_WIN)
+CRIME_LOSE_MORE = _p.merge(CRIME_LOSE_MORE, _p.CRIME_LOSE)
+DATE_MORE = _p.merge(DATE_MORE, _p.DATE_EVENTS)
+HEIST_TARGETS_MORE = _p.merge(HEIST_TARGETS_MORE, _p.HEISTS)
+BOSS_MORE = _p.merge(BOSS_MORE, _p.BOSSES)
+FISH_EXTRA = _p.merge_dict(FISH_EXTRA, _p.FISH)
+MINE_EXTRA = _p.merge_dict(MINE_EXTRA, _p.MINE)
+EXP_TALES_MORE = _p.merge_dict(EXP_TALES_MORE, _p.TALES)

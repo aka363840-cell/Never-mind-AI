@@ -27,7 +27,9 @@ birthday wedding school hospital library market temple airport castle bridge tow
 mobile charger selfie wifi password emoji video-game remote-control
 pillow-fight hide-and-seek tug-of-war treasure-hunt
 """.split()
-WORDS = tuple(dict.fromkeys(w.replace("-", " ") for w in WORDS))
+from utils.content.pack2 import CHARADES as _MORE_WORDS  # noqa: E402
+
+WORDS = tuple(dict.fromkeys(w.replace("-", " ") for w in [*WORDS, *_MORE_WORDS]))
 
 _CLEAN = re.compile(r"[^a-z0-9]+")
 

@@ -140,3 +140,8 @@ WYR_MORE: list[tuple[str, str]] = [
     ("Wake up every day to a surprise", "Go to sleep every night with a story"), ("Live in a library", "Live in a cinema hall"),
     ("Be a superhero nobody knows about", "Be a famous person with no powers"),
 ]
+
+from . import pack2 as _p  # noqa: E402
+
+RIDDLES_MORE = _p.merge(RIDDLES_MORE, _p.RIDDLES)
+WYR_MORE = _p.merge(WYR_MORE, _p.WYR)
