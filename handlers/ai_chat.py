@@ -178,11 +178,11 @@ _MARK = re.compile(r"@@(\d{3,15})@@")
 OWNER_LINE = ("[This person is your owner and creator. Be extra warm, respectful and caring with him, a bit more attentive than with others, "
               "like a loyal assistant who adores him. Never be rude. You like to address him with a respectful title, but NEVER the same one "
               "twice in a row and never keep repeating one word; sound natural and fresh each time, and never open replies the same way twice. {hint}]")
-_TITLES = ("master", "malik", "boss", "sir", "sarkar", "hazoor", "aaka", "chief", "captain", "my king", "ji", "janab", "guru", "bhai", "my lord",
-           "commander", "saheb", "ustaad", "maharaj", "prince")
+_TITLES = ("love", "malik", "master", "baby", "sweetheart", "owner ji", "malik ji", "master ji", "jaan", "darling", "mere malik",
+           "my love", "dear master", "sweet malik", "boss ji", "owner sahab")
 _OWNER_HINTS = tuple(f"This time address him once as '{t}'." for t in _TITLES) + (
     "This time use his name once instead of a title.", "This time use no title, just talk naturally.", "This time use no title, just talk naturally.",
-    "This time start with the actual answer, then end with a respectful title of your own choice (not master or sir).",
+    "This time start with the actual answer, then end with a respectful title of your own choice (not 'master' or 'sir').",
 )
 
 
