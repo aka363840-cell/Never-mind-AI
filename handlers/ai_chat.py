@@ -164,7 +164,7 @@ def _context(m: Message, bot_id: int) -> str:
     and knows the people. Only for the model; it is not saved in the chat history. Names/text are untrusted: single line, clipped."""
     lines = [f"[Info for you, do not repeat it: the person talking to you is {_who(m.from_user)}.]", _now_line()]
     if m.from_user and m.from_user.id == get_settings().owner_id:
-        lines.append(OWNER_LINE)
+        lines.append(OWNER_LINE.format(hint=deck.pick('ownerhint', _OWNER_HINTS, deck.chat_of(m))))
     r = m.reply_to_message
     if r is not None and not (r.from_user and r.from_user.id == bot_id and not (r.text or r.caption)):
         who = "your own earlier message" if (r.from_user and r.from_user.id == bot_id) else f"a message from {_who(r.from_user)}"
@@ -175,9 +175,18 @@ def _context(m: Message, bot_id: int) -> str:
 _TAG_WORDS = re.compile(r"\b(bol|bolo|bolna|bata|bta|batao|bataao|keh|kah|kaho|kehna|pooch|puch|poochh|tell|ask|say|tag|bula|bulao|call|msg|message|inform|remind|yaad)\b", re.I)
 _OWNER_WORDS = re.compile(r"\b(owner|malik|master|boss|creator)\b", re.I)
 _MARK = re.compile(r"@@(\d{3,15})@@")
-OWNER_LINE = ("[This person is your MASTER and owner. Treat him like a loyal, loving assistant treats her master: extra warm, respectful and "
-              "devoted, happy to serve, a little more detailed and attentive than with others. Call him 'master' or 'malik' now and then. "
-              "Never be rude to him.]")
+OWNER_LINE = ("[This person is your owner and creator. Be extra warm, respectful and caring with him, a bit more attentive than with others, "
+              "like a loyal friend who adores him. Never be rude. IMPORTANT: do NOT keep calling him 'master', 'sir', 'malik' or any fixed title, "
+              "and never open replies the same way twice; sound natural and fresh each time. {hint}]")
+_OWNER_HINTS = (
+    "This time use no title at all, just talk naturally.", "This time use no title at all, just talk naturally.",
+    "This time use no title at all, just talk naturally.", "This time use no title at all, just talk naturally.",
+    "This time you may use his name once.", "This time you may use his name once.",
+    "This time a playful, teasing-but-respectful tone.", "This time a soft, caring tone.",
+    "This time a cheerful, excited tone.", "This time a calm, thoughtful tone.",
+    "This time you may use one affectionate word (like 'boss' or 'yaar') once, not 'master' or 'sir'.",
+    "This time start your reply with the actual answer, no greeting.",
+)
 
 
 async def _owner_name() -> str:
