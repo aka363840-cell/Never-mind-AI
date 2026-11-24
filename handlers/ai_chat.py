@@ -182,7 +182,7 @@ _TITLES = ("love", "malik", "master", "baby", "sweetheart", "owner ji", "malik j
            "my love", "dear master", "sweet malik", "boss ji", "owner sahab")
 _OWNER_HINTS = tuple(f"This time address him once as '{t}'." for t in _TITLES) + (
     "This time use his name once instead of a title.", "This time use no title, just talk naturally.", "This time use no title, just talk naturally.",
-    "This time start with the actual answer, then end with a respectful title of your own choice (not 'master' or 'sir').",
+    "This time start with the actual answer, then end with a respectful title of your own choice (different from the one you used last).",
 )
 
 
