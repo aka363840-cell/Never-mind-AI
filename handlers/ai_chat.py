@@ -4,13 +4,16 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import random
 import time
 from io import BytesIO
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command, CommandObject
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, MessageEntity
+from aiogram.types import User as TgUser
+from sqlalchemy import select
 from aiogram.utils.chat_action import ChatActionSender
 
 from ai.gemini import BLOCKED_REPLY
@@ -20,6 +23,7 @@ from ai import tts
 from services import voiceaccess as voice_access
 from aiogram.types import BufferedInputFile
 from config import get_settings
+from database.models import GroupMember, GroupStat, User
 from database.session import db
 from handlers import admin as admin_h
 from services import admin as adm
@@ -144,11 +148,92 @@ def _context(m: Message, bot_id: int) -> str:
     """Tells the AI WHO is talking to her and WHAT message they tagged her on (the replied-to message), so she can read it
     and knows the people. Only for the model; it is not saved in the chat history. Names/text are untrusted: single line, clipped."""
     lines = [f"[Info for you, do not repeat it: the person talking to you is {_who(m.from_user)}.]"]
+    if m.from_user and m.from_user.id == get_settings().owner_id:
+        lines.append(OWNER_LINE)
     r = m.reply_to_message
     if r is not None and not (r.from_user and r.from_user.id == bot_id and not (r.text or r.caption)):
         who = "your own earlier message" if (r.from_user and r.from_user.id == bot_id) else f"a message from {_who(r.from_user)}"
         lines.append(f"[They are replying to {who}. That message says: \"{_msg_text(r)}\". Use it when answering.]")
     return " ".join(lines) + "\n"
+
+
+_TAG_WORDS = re.compile(r"\b(bol|bolo|bolna|bata|bta|batao|bataao|keh|kah|kaho|kehna|pooch|puch|poochh|tell|ask|say|tag|bula|bulao|call|msg|message|inform|remind|yaad)\b", re.I)
+_OWNER_WORDS = re.compile(r"\b(owner|malik|master|boss|creator)\b", re.I)
+_MARK = re.compile(r"@@(\d{3,15})@@")
+OWNER_LINE = ("[This person is your MASTER and owner. Treat him like a loyal, loving assistant treats her master: extra warm, respectful and "
+              "devoted, happy to serve, a little more detailed and attentive than with others. Call him 'master' or 'malik' now and then. "
+              "Never be rude to him.]")
+
+
+async def _owner_name() -> str:
+    oid = get_settings().owner_id
+    try:
+        async with db.tx() as s:
+            u = await s.get(User, oid) if oid else None
+        return (u.first_name if u else "") or "your owner"
+    except Exception:
+        return "your owner"
+
+
+async def _tag_candidates(m: Message, bot_id: int, text: str) -> dict[int, str]:
+    """People the asker may want Ella to tag ("Ravi ko bol ki ..."). Found ONLY from what is in the message (a @username,
+    a tapped mention, or a first name of someone seen in this group) - the AI can later tag nobody outside this dict."""
+    out: dict[int, str] = {}
+    ents = list(m.entities or [])
+    wants = bool(_TAG_WORDS.search(text)) or any(e.type in ("mention", "text_mention") for e in ents)
+    if not wants:
+        return out
+    low = text.lower()
+    try:
+        async with db.tx() as s:
+            for e in ents:
+                if e.type == "text_mention" and e.user and e.user.id != bot_id and not e.user.is_bot:
+                    out[e.user.id] = _clip(e.user.full_name or e.user.first_name, 40)
+                elif e.type == "mention":
+                    un = (m.text or "")[e.offset + 1:e.offset + e.length].lower()
+                    row = (await s.execute(select(User.id, User.first_name).where(User.username_lc == un))).first()
+                    if row and row[0] != bot_id:
+                        out[row[0]] = _clip(row[1], 40)
+            ids = set((await s.execute(select(GroupMember.user_id).where(GroupMember.chat_id == m.chat.id))).scalars())
+            ids.update((await s.execute(select(GroupStat.user_id).where(GroupStat.chat_id == m.chat.id))).scalars())
+            if _OWNER_WORDS.search(text) and get_settings().owner_id:
+                ids.add(get_settings().owner_id)
+            if ids:
+                rows = (await s.execute(select(User.id, User.first_name).where(User.id.in_(ids), User.deleted_account == False))).all()  # noqa: E712
+                for uid, nm in rows:
+                    nm = _clip(nm or "", 40)
+                    if uid != bot_id and len(nm) >= 3 and re.search(rf"(?<!\w){re.escape(nm.lower())}(?!\w)", low):
+                        out[uid] = nm
+                    elif uid == get_settings().owner_id and _OWNER_WORDS.search(text):
+                        out[uid] = nm or "owner"
+    except Exception:
+        log.warning("tag candidate lookup failed", exc_info=True)
+    return dict(list(out.items())[:5])
+
+
+def _tag_line(cands: dict[int, str]) -> str:
+    if not cands:
+        return ""
+    who = "; ".join(f"{n} = @@{i}@@" for i, n in cands.items())
+    return (f"[If they ask you to tell/ask/call one of these people, address that person in your reply by writing their marker exactly "
+            f"as given (e.g. @@123@@), once, where their name belongs. People: {who}. Never invent other markers.]")
+
+
+def _with_tags(text: str, cands: dict[int, str]) -> tuple[str, list[MessageEntity]]:
+    """Swap each allowed @@id@@ for the person's name and make it a real tappable mention. Unknown markers are just removed."""
+    out, ents, pos = "", [], 0
+    for mt in _MARK.finditer(text):
+        out += text[pos:mt.start()]
+        pos = mt.end()
+        uid = int(mt.group(1))
+        if uid not in cands:
+            continue
+        nm = cands[uid]
+        off = len(out.encode("utf-16-le")) // 2
+        ents.append(MessageEntity(type="text_mention", offset=off, length=len(nm.encode("utf-16-le")) // 2,
+                                  user=TgUser(id=uid, is_bot=False, first_name=nm)))
+        out += nm
+    return out + text[pos:], ents
 
 
 async def _delete_later(msg: Message, delay: int = STICKER_REPLY_TTL_S) -> None:
@@ -367,7 +452,8 @@ async def _talk(m: Message, bot: Bot, ai: ChatService | None, text: str,
             return
     try:
         async with ChatActionSender.typing(bot=bot, chat_id=m.chat.id):
-            answer = await ai.reply(m.from_user.id, m.chat.id, text, image, mime, context=_context(m, bot.id))
+            cands = {} if sticker else await _tag_candidates(m, bot.id, text)
+            answer = await ai.reply(m.from_user.id, m.chat.id, text, image, mime, context=_context(m, bot.id) + _tag_line(cands) + ("\n" if cands else ""))
     except AIRateLimited as e:
         await _send(m, f"✋ Slow down a little — try again in {dur(e.retry_after)}.")
         return
@@ -383,10 +469,11 @@ async def _talk(m: Message, bot: Bot, ai: ChatService | None, text: str,
         return
     if sticker and answer.strip() == BLOCKED_REPLY:    # the AI's safety filter refused the picture (nudity etc.)
         answer = "🙈 Let's keep the stickers fun and clean here, please! 🦋"
-    if not sticker and await _speak(m, answer):     # owner voice mode: voice instead of text
+    if not sticker and await _speak(m, _with_tags(answer, cands)[0]):     # owner voice mode: voice instead of text
         return
     for part in split_text(answer):
-        await _send(m, part, parse_mode=None)       # model output is untrusted: send as plain text
+        part, ents = _with_tags(part, cands)
+        await _send(m, part, parse_mode=None, **({"entities": ents} if ents else {}))   # model output is untrusted: plain text + only our own mention entities
 
 
 @router.message(Command("ask", "chat", "bot"))
