@@ -140,7 +140,7 @@ class ChatService:
         if await kv.incr_window("ai:global", 60) > self.global_rpm:   # protect the shared free quota (bot.py scales it by key count)
             raise AIRateLimited(max(1, await kv.ttl("ai:global")))
 
-    async def reply(self, user_id: int, chat_id: int, text: str, image: bytes | None = None, image_mime: str = "image/webp") -> str:
+    async def reply(self, user_id: int, chat_id: int, text: str, image: bytes | None = None, image_mime: str = "image/webp", context: str = "") -> str:
         text = text.strip()[: self.max_input]
         if not text:
             return "…"
@@ -152,7 +152,7 @@ class ChatService:
             except Exception:                  # DB trouble must not take chat down: answer without context
                 log.exception("AI history load failed; continuing without context")
                 history = []
-            turns = [ChatTurn(r, c) for r, c in history] + [ChatTurn("user", text, image, image_mime)]
+            turns = [ChatTurn(r, c) for r, c in history] + [ChatTurn("user", (context + text) if context else text, image, image_mime)]
             try:
                 answer = await asyncio.wait_for(self.p.generate(system_prompt(), turns), timeout=getattr(self.p, "budget", 10) + 3)
             except asyncio.TimeoutError:

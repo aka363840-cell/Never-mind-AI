@@ -119,6 +119,38 @@ async def _send_sticker(m: Message, bot: Bot) -> bool:
         return False
 
 
+def _clip(v: str, n: int) -> str:
+    return " ".join((v or "").split())[:n]
+
+
+def _who(u) -> str:
+    if not u:
+        return "someone"
+    nm = _clip(u.full_name or u.first_name or "", 40) or "someone"
+    return f"{nm} (@{u.username})" if getattr(u, "username", None) else nm
+
+
+def _msg_text(r: Message) -> str:
+    t = r.text or r.caption or ""
+    if t:
+        return _clip(t, 500)
+    if r.sticker:
+        return f"[a sticker {r.sticker.emoji or ''}]".replace(" ]", "]")
+    kind = r.content_type.value if hasattr(r.content_type, "value") else str(r.content_type)
+    return f"[a {kind} with no text]"
+
+
+def _context(m: Message, bot_id: int) -> str:
+    """Tells the AI WHO is talking to her and WHAT message they tagged her on (the replied-to message), so she can read it
+    and knows the people. Only for the model; it is not saved in the chat history. Names/text are untrusted: single line, clipped."""
+    lines = [f"[Info for you, do not repeat it: the person talking to you is {_who(m.from_user)}.]"]
+    r = m.reply_to_message
+    if r is not None and not (r.from_user and r.from_user.id == bot_id and not (r.text or r.caption)):
+        who = "your own earlier message" if (r.from_user and r.from_user.id == bot_id) else f"a message from {_who(r.from_user)}"
+        lines.append(f"[They are replying to {who}. That message says: \"{_msg_text(r)}\". Use it when answering.]")
+    return " ".join(lines) + "\n"
+
+
 async def _delete_later(msg: Message, delay: int = STICKER_REPLY_TTL_S) -> None:
     await asyncio.sleep(delay)
     try:
@@ -326,7 +358,7 @@ async def _talk(m: Message, bot: Bot, ai: ChatService | None, text: str,
     if await _cooldown_blocked(m):
         return
     roll = random.random()
-    if sticker and roll < 0.25 and await _send_sticker(m, bot):     # to a sticker she answers with ONLY a sticker (25%) or ONLY text (75%); normal chat never gets stickers
+    if sticker and roll < 0.5 and await _send_sticker(m, bot):     # to a sticker she answers with ONLY a sticker (50%) or ONLY text (50%); normal chat never gets stickers
         return
     if not sticker and maybe_identity(text):         # unusual wording: let the AI decide if it is really "who made you / your code"
         kind = await ai.identity(text)
@@ -335,7 +367,7 @@ async def _talk(m: Message, bot: Bot, ai: ChatService | None, text: str,
             return
     try:
         async with ChatActionSender.typing(bot=bot, chat_id=m.chat.id):
-            answer = await ai.reply(m.from_user.id, m.chat.id, text, image, mime)
+            answer = await ai.reply(m.from_user.id, m.chat.id, text, image, mime, context=_context(m, bot.id))
     except AIRateLimited as e:
         await _send(m, f"✋ Slow down a little — try again in {dur(e.retry_after)}.")
         return
