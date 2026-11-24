@@ -310,7 +310,7 @@ MSG_NOTE = ("ℹ️ Telegram doesn't report which of the submitted message ids s
             "Bots can't delete messages older than 48 hours in most chats.")
 
 
-@command("purge", cat="mass", usage="/purge (reply to the first message to delete)  or  /purge <N>", desc="Delete everything from the replied message down to now (asks YES/NO above 10 messages)")
+@command("purge", cat="mass", usage="/purge (reply to the first message to delete)  or  /purge <N>", desc="Delete everything from the replied message down to now (runs at once, no YES/NO)")
 async def cmd_purge(m: Message, command: CommandObject, bot: Bot):
     r = await prepare(m, command, bot, right="delete")
     if m.reply_to_message:
@@ -323,12 +323,9 @@ async def cmd_purge(m: Message, command: CommandObject, bot: Bot):
     n = last - first + 1
     if n > MAX_PURGE:
         raise ModError(f"✂️ That's {n} messages; the limit per purge is {MAX_PURGE}. Reply to a more recent message.")
-    if n <= 10:
-        done = await actions.delete_many(bot, r.chat_id, list(range(first, last + 1)))
-        await store.log_action(r.chat_id, r.actor, None, "purge", detail=f"{first}-{last}", source="manual")
-        return
-    await confirm.request(m, bot, "purge", {"first": first, "last": last}, title="MASS DELETE messages",
-                          lines=[f"🗑 About <b>{n}</b> messages (from everyone) will be deleted."])
+    done = await actions.delete_many(bot, r.chat_id, list(range(first, last + 1)))        # no YES/NO: the owner asked for it to run at once
+    await store.log_action(r.chat_id, r.actor, None, "purge", detail=f"{first}-{last} submitted={done}", source="manual")
+    await bot.send_message(r.chat_id, f"🗑 Done - {done} messages cleaned.")             # stays: it is NOT auto-deleted
 
 
 async def _vanish(ctx: Ctx, secs: int = 6) -> None:
@@ -346,21 +343,23 @@ async def _run_purge(ctx: Ctx) -> str:
     first, last = int(ctx.payload["first"]), int(ctx.payload["last"])
     done = await actions.delete_many(ctx.bot, ctx.chat_id, list(range(first, last + 1)))
     await store.log_action(ctx.chat_id, ctx.issuer, None, "purge", detail=f"{first}-{last} submitted={done}", source="bulk")
-    await _vanish(ctx)
     return f"🗑 Done - {done} messages cleaned."
 
 
 confirm.register("purge", Spec(actor_right="delete", bot_right="delete", run=_run_purge))
 
 
-@command("delall", cat="mass", usage="/delall <target>", desc="Delete every recent message (last ~48h that I tracked) of one member (asks YES/NO)")
+@command("delall", cat="mass", usage="/delall <target>", desc="Delete every recent message (last ~48h that I tracked) of one member (runs at once, no YES/NO)")
 async def cmd_delall(m: Message, command: CommandObject, bot: Bot):
     r = await prepare(m, command, bot, right="delete", target=True, allow_self=True, allow_admin_target=True)   # deleting messages is fine for yourself and other admins too
     msgs = await store.recent_msgs(r.chat_id, user_id=r.target, since=store.now() - 2 * 86400)
     if not msgs:
         raise ModError("ℹ️ I have no recent messages of that member on record (I only keep ~48 hours; Telegram offers no 'delete all by user' call).")
-    await confirm.request(m, bot, "delall", {"uid": r.target}, title="DELETE all messages of one member",
-                          lines=[f"👤 {await r.who()}", f"🗑 <b>{len(msgs)}</b> recent messages will be deleted."])
+    ids = [x.message_id for x in msgs]
+    done = await actions.delete_many(bot, r.chat_id, ids)                               # no YES/NO
+    await store.forget_msgs(r.chat_id, ids)
+    await store.log_action(r.chat_id, r.actor, r.target, "delall", detail=f"submitted={done}/{len(ids)}", source="manual")
+    await bot.send_message(r.chat_id, f"🗑 Done - {done} messages deleted.")            # stays: it is NOT auto-deleted
 
 
 async def _run_delall(ctx: Ctx) -> str:
@@ -369,7 +368,6 @@ async def _run_delall(ctx: Ctx) -> str:
     done = await actions.delete_many(ctx.bot, ctx.chat_id, ids)
     await store.forget_msgs(ctx.chat_id, ids)
     await store.log_action(ctx.chat_id, ctx.issuer, uid, "delall", detail=f"submitted={done}/{len(ids)}", source="bulk")
-    await _vanish(ctx)
     return f"🗑 Done - {done} messages deleted."
 
 

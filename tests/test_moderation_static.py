@@ -139,9 +139,10 @@ def test_serious_commands_always_confirm():
     for name in SERIOUS:
         fn = f"cmd_{name}"
         assert fn in calls, f"missing handler {fn}"
-        assert calls[fn] or name in ("permissions", "cleanservice", "setadmin", "purge", "lockdown", "modrestore"), f"/{name} executes without confirmation"
+        assert calls[fn] or name in ("permissions", "cleanservice", "setadmin", "purge", "delall", "lockdown", "modrestore"), f"/{name} executes without confirmation"
     # conditionally-confirmed ones must still reference the confirmation system somewhere
-    for name in ("purge", "cleanservice", "permissions", "lockdown", "modrestore", "setadmin"):
+    # (/purge and /delall are deliberately NOT here: the owner asked for them to run at once, with no YES/NO)
+    for name in ("cleanservice", "permissions", "lockdown", "modrestore", "setadmin"):
         assert calls[f"cmd_{name}"], name
 
 
