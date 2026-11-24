@@ -68,11 +68,18 @@ async def synth(text: str, voice: str = "") -> tuple[bytes, bool] | None:
     if not text or len(text) > MAX_CHARS:            # too long to speak in one go: caller keeps the text reply
         last_error = "answer too long or empty for voice"
         return None
-    try:
-        mp3 = await asyncio.wait_for(_mp3(text, voice_id(voice)), 30)
-    except Exception as e:
-        last_error = f"{type(e).__name__}: {e}"[:200]
-        log.warning("edge-tts failed", exc_info=True)
+    mp3 = b""
+    for attempt in range(3):                          # the free endpoint sometimes drops a request: retry before giving up
+        try:
+            mp3 = await asyncio.wait_for(_mp3(text, voice_id(voice)), 30)
+            if mp3:
+                last_error = ""
+                break
+        except Exception as e:
+            last_error = f"{type(e).__name__}: {e}"[:200]
+            log.warning("edge-tts attempt %d failed", attempt + 1, exc_info=True)
+        await asyncio.sleep(1 + attempt)
+    if not mp3 and last_error:
         return None
     if not mp3:
         last_error = "edge-tts returned no audio"
