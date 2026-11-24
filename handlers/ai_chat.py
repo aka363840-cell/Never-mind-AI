@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import random
+import time
 from io import BytesIO
 
 from aiogram import Bot, F, Router
@@ -22,7 +25,7 @@ from handlers import admin as admin_h
 from services import admin as adm
 from services.errors import GameError
 from services.kv import kv
-from utils import brand
+from utils import brand, deck
 from utils.identity import DEVELOPER_ID, classify, dev_reply, leaks_provider, maybe_identity
 from utils.fmt import esc, num
 from utils.targets import resolve_target
@@ -82,8 +85,38 @@ async def _dev_tag(bot: Bot) -> str:
     return f'<a href="tg://user?id={DEVELOPER_ID}">{esc(name)}</a>'
 
 
-STICKER_REPLY_TTL_S = 120          # the bot's reply to a sticker disappears after 2 minutes
+STICKER_REPLY_TTL_S = 120          # (unused now: replies to stickers are kept, not deleted)
 _bg: set[asyncio.Task] = set()     # keep references so the delete tasks are not garbage-collected
+
+
+STICKER_PACK = os.getenv("ELLA_STICKER_PACK", "stik_79969_by_TgEmojis_bot").strip()
+_stk: tuple[float, list[str]] = (0.0, [])
+
+
+async def _pack_ids(bot: Bot) -> list[str]:
+    """file_ids of Ella's own sticker pack, cached for an hour. Empty list when the pack can't be read."""
+    global _stk
+    if time.monotonic() - _stk[0] < 3600 and (_stk[1] or time.monotonic() - _stk[0] < 120):
+        return _stk[1]
+    try:
+        ids = [x.file_id for x in (await bot.get_sticker_set(STICKER_PACK)).stickers]
+    except Exception:
+        log.warning("could not read sticker pack %s", STICKER_PACK, exc_info=True)
+        ids = []
+    _stk = (time.monotonic(), ids)
+    return ids
+
+
+async def _send_sticker(m: Message, bot: Bot) -> bool:
+    try:
+        ids = await _pack_ids(bot)
+        if not ids:
+            return False
+        await m.reply_sticker(deck.pick("ellastk", ids, deck.chat_of(m)))
+        return True
+    except Exception:
+        log.warning("sticker send failed", exc_info=True)
+        return False
 
 
 async def _delete_later(msg: Message, delay: int = STICKER_REPLY_TTL_S) -> None:
@@ -292,6 +325,9 @@ async def _talk(m: Message, bot: Bot, ai: ChatService | None, text: str,
         return
     if await _cooldown_blocked(m):
         return
+    roll = random.random()
+    if sticker and roll < 0.3 and await _send_sticker(m, bot):     # sometimes she answers a sticker with just a sticker (saves AI quota)
+        return
     if not sticker and maybe_identity(text):         # unusual wording: let the AI decide if it is really "who made you / your code"
         kind = await ai.identity(text)
         if kind:
@@ -301,14 +337,14 @@ async def _talk(m: Message, bot: Bot, ai: ChatService | None, text: str,
         async with ChatActionSender.typing(bot=bot, chat_id=m.chat.id):
             answer = await ai.reply(m.from_user.id, m.chat.id, text, image, mime)
     except AIRateLimited as e:
-        await _send(m, f"✋ Slow down a little — try again in {dur(e.retry_after)}.", expire=sticker)
+        await _send(m, f"✋ Slow down a little — try again in {dur(e.retry_after)}.")
         return
     except (AIQuotaExceeded, AIUnavailable):
-        await _send(m, unavailable(), expire=sticker)
+        await _send(m, unavailable())
         return
     except Exception:
         log.exception("AI failure")
-        await _send(m, unavailable(), expire=sticker)
+        await _send(m, unavailable())
         return
     if leaks_provider(answer):                        # the AI named a company/model as its maker: never send that
         await m.reply(dev_reply("dev", await _dev_tag(bot)))
@@ -318,7 +354,9 @@ async def _talk(m: Message, bot: Bot, ai: ChatService | None, text: str,
     if not sticker and await _speak(m, answer):     # owner voice mode: voice instead of text
         return
     for part in split_text(answer):
-        await _send(m, part, expire=sticker, parse_mode=None)       # model output is untrusted: send as plain text
+        await _send(m, part, parse_mode=None)       # model output is untrusted: send as plain text
+    if roll < (0.6 if sticker else 0.12):             # sometimes a sticker after the text, mostly just the reply
+        await _send_sticker(m, bot)
 
 
 @router.message(Command("ask", "chat", "bot"))
