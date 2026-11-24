@@ -326,7 +326,7 @@ async def _talk(m: Message, bot: Bot, ai: ChatService | None, text: str,
     if await _cooldown_blocked(m):
         return
     roll = random.random()
-    if sticker and roll < 0.3 and await _send_sticker(m, bot):     # sometimes she answers a sticker with just a sticker (saves AI quota)
+    if sticker and roll < 0.25 and await _send_sticker(m, bot):     # to a sticker she answers with ONLY a sticker (25%) or ONLY text (75%); normal chat never gets stickers
         return
     if not sticker and maybe_identity(text):         # unusual wording: let the AI decide if it is really "who made you / your code"
         kind = await ai.identity(text)
@@ -355,8 +355,6 @@ async def _talk(m: Message, bot: Bot, ai: ChatService | None, text: str,
         return
     for part in split_text(answer):
         await _send(m, part, parse_mode=None)       # model output is untrusted: send as plain text
-    if roll < (0.6 if sticker else 0.12):             # sometimes a sticker after the text, mostly just the reply
-        await _send_sticker(m, bot)
 
 
 @router.message(Command("ask", "chat", "bot"))
