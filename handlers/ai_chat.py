@@ -176,16 +176,13 @@ _TAG_WORDS = re.compile(r"\b(bol|bolo|bolna|bata|bta|batao|bataao|keh|kah|kaho|k
 _OWNER_WORDS = re.compile(r"\b(owner|malik|master|boss|creator)\b", re.I)
 _MARK = re.compile(r"@@(\d{3,15})@@")
 OWNER_LINE = ("[This person is your owner and creator. Be extra warm, respectful and caring with him, a bit more attentive than with others, "
-              "like a loyal friend who adores him. Never be rude. IMPORTANT: do NOT keep calling him 'master', 'sir', 'malik' or any fixed title, "
-              "and never open replies the same way twice; sound natural and fresh each time. {hint}]")
-_OWNER_HINTS = (
-    "This time use no title at all, just talk naturally.", "This time use no title at all, just talk naturally.",
-    "This time use no title at all, just talk naturally.", "This time use no title at all, just talk naturally.",
-    "This time you may use his name once.", "This time you may use his name once.",
-    "This time a playful, teasing-but-respectful tone.", "This time a soft, caring tone.",
-    "This time a cheerful, excited tone.", "This time a calm, thoughtful tone.",
-    "This time you may use one affectionate word (like 'boss' or 'yaar') once, not 'master' or 'sir'.",
-    "This time start your reply with the actual answer, no greeting.",
+              "like a loyal assistant who adores him. Never be rude. You like to address him with a respectful title, but NEVER the same one "
+              "twice in a row and never keep repeating one word; sound natural and fresh each time, and never open replies the same way twice. {hint}]")
+_TITLES = ("master", "malik", "boss", "sir", "sarkar", "hazoor", "aaka", "chief", "captain", "my king", "ji", "janab", "guru", "bhai", "my lord",
+           "commander", "saheb", "ustaad", "maharaj", "prince")
+_OWNER_HINTS = tuple(f"This time address him once as '{t}'." for t in _TITLES) + (
+    "This time use his name once instead of a title.", "This time use no title, just talk naturally.", "This time use no title, just talk naturally.",
+    "This time start with the actual answer, then end with a respectful title of your own choice (not master or sir).",
 )
 
 
