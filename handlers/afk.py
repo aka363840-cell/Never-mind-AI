@@ -12,10 +12,18 @@ from aiogram.types import Message, TelegramObject
 
 from services import afk
 from services.kv import kv
+from utils import deck
 from utils.fmt import dur, esc, mention
 
 log = logging.getLogger(__name__)
 router = Router()
+
+BYE = (   # the line under "is now AFK": a different one each time instead of the same sentence
+    "Take your time, I'll hold the fort 🌙", "Go recharge, we'll be right here 💫", "Off you go - rest well 🌸",
+    "Don't worry, I'll cover for you 🛡", "See you soon, don't stay away too long 🦋", "Enjoy your break, you've earned it ☕",
+    "Your seat stays warm until you're back 🔥", "Catch you later, superstar ✨", "Go, do your thing - I've got this 💪",
+    "Sweet dreams or sweet work, whichever it is 🍀", "I'll guard your place till you return 🏰", "Come back with good stories 🎈",
+)
 
 
 @router.message(Command("afk"))
@@ -26,7 +34,7 @@ async def afk_cmd(m: Message, command: CommandObject):
     await afk.set_away(m.from_user.id, reason)
     name = mention(m.from_user.id, m.from_user.full_name)
     await m.reply(f"😴 {name} is now <b>AFK</b>" + (f": {esc(reason[:100])}" if reason else "") +
-                  "\n<i>I'll tell anyone who tags you, and welcome you back when you write again.</i>")
+                  f"\n<i>{deck.pick('afkbye', BYE, deck.chat_of(m))}</i>")
 
 
 def _is_afk_cmd(m: Message) -> bool:
