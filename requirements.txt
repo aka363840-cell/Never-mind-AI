@@ -8,3 +8,4 @@ asyncpg>=0.29
 redis>=5.0
 telethon>=1.36
 edge-tts>=6.1
+tzdata>=2024.1

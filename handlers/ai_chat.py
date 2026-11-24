@@ -144,10 +144,25 @@ def _msg_text(r: Message) -> str:
     return f"[a {kind} with no text]"
 
 
+def _now_line() -> str:
+    """The REAL current date and time, so she never guesses (the model has no clock). Zone: ELLA_TZ, default India (IST)."""
+    from datetime import datetime, timedelta, timezone
+    name = os.getenv("ELLA_TZ", "Asia/Kolkata").strip()
+    try:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(name)
+    except Exception:
+        tz, name = timezone(timedelta(hours=5, minutes=30)), "IST"
+    n = datetime.now(tz)
+    return (f"[The real current date and time is {n.strftime('%A, %d %B %Y, %I:%M %p')} ({name}). "
+            f"Use exactly this for any question about today, the date, the day, the time, the month or the year; never guess it. "
+            f"For other time zones or 'days until', calculate from this.]")
+
+
 def _context(m: Message, bot_id: int) -> str:
     """Tells the AI WHO is talking to her and WHAT message they tagged her on (the replied-to message), so she can read it
     and knows the people. Only for the model; it is not saved in the chat history. Names/text are untrusted: single line, clipped."""
-    lines = [f"[Info for you, do not repeat it: the person talking to you is {_who(m.from_user)}.]"]
+    lines = [f"[Info for you, do not repeat it: the person talking to you is {_who(m.from_user)}.]", _now_line()]
     if m.from_user and m.from_user.id == get_settings().owner_id:
         lines.append(OWNER_LINE)
     r = m.reply_to_message
