@@ -17,15 +17,27 @@ VOICES = {   # short name -> (edge voice id, what it is)
     "prabhat": ("en-IN-PrabhatNeural", "Indian English, man"),
     "swara": ("hi-IN-SwaraNeural", "Hindi, woman (best for Devanagari text)"),
     "madhur": ("hi-IN-MadhurNeural", "Hindi, man"),
-    "aria": ("en-US-AriaNeural", "US English, woman"),
-    "jenny": ("en-US-JennyNeural", "US English, friendly woman"),
-    "guy": ("en-US-GuyNeural", "US English, man"),
-    "sonia": ("en-GB-SoniaNeural", "British English, woman"),
-    "ryan": ("en-GB-RyanNeural", "British English, man"),
+    "aria": ("en-US-AriaNeural", "US English, woman (English text only)"),
+    "jenny": ("en-US-JennyNeural", "US English, friendly woman (English text only)"),
+    "guy": ("en-US-GuyNeural", "US English, man (English text only)"),
+    "sonia": ("en-GB-SoniaNeural", "British English, woman (English text only)"),
+    "ryan": ("en-GB-RyanNeural", "British English, man (English text only)"),
 }
 DEFAULT = "neerja"
 _EMOJI = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\uFE0F\u200d]")
 _MD = re.compile(r"[*_`#>~]|\[|\]|https?://\S+")
+
+
+SAMPLES = {   # test sentence in the voice's OWN language (an English voice reading Hinglish sounds like gibberish)
+    "hi": "नमस्ते, मैं एला हूँ। अब मैं इसी आवाज़ में बात करूँगी।",
+    "en-IN": "Hi, main Ella hoon. Ab main isi awaaz mein baat karungi.",
+    "en": "Hi, I'm Ella. This is how I will sound when I talk to you.",
+}
+
+
+def sample(v: str) -> str:
+    vid = voice_id(v)
+    return SAMPLES["hi"] if vid.startswith("hi-") else SAMPLES["en-IN"] if vid.startswith("en-IN") else SAMPLES["en"]
 
 
 def voice_id(v: str) -> str:

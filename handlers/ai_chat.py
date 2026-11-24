@@ -163,6 +163,13 @@ def _context(m: Message, bot_id: int) -> str:
     """Tells the AI WHO is talking to her and WHAT message they tagged her on (the replied-to message), so she can read it
     and knows the people. Only for the model; it is not saved in the chat history. Names/text are untrusted: single line, clipped."""
     lines = [f"[Info for you, do not repeat it: the person talking to you is {_who(m.from_user)}.]", _now_line()]
+    if m.from_user and _voice_ok(m.from_user.id):             # her answer will be SPOKEN: write it in the voice's own language
+        on, vname = voice_access.prefs(m.from_user.id)
+        vid = tts.voice_id(vname) if on else ""
+        if vid.startswith(("en-US", "en-GB")):
+            lines.append("[Your answer will be spoken aloud by an English voice: reply in plain English only, no Hindi/Hinglish words.]")
+        elif vid.startswith("hi-"):
+            lines.append("[Your answer will be spoken aloud by a Hindi voice: reply in Hindi written in Devanagari script only, no English letters.]")
     if m.from_user and m.from_user.id == get_settings().owner_id:
         lines.append(OWNER_LINE.format(hint=deck.pick('ownerhint', _OWNER_HINTS, deck.chat_of(m))))
     r = m.reply_to_message
@@ -292,7 +299,7 @@ def _voice_help(on: bool, name: str) -> str:
     lst = "\n".join(f"<code>{k}</code> - {d}" for k, (_, d) in tts.VOICES.items())
     return (f"🎙 Voice mode: <b>{'ON - I reply with voice only' if on else 'OFF'}</b>\nVoice: <b>{name}</b>\n\n"
             f"<code>/voice on</code> · <code>/voice off</code> · <code>/voice &lt;name&gt;</code>\n"
-            f"Voices:\n{lst}\n\n<i>Very long answers still come as text.</i>")
+            f"Voices:\n{lst}\n\n<i>English-only voices read Hinglish badly: for Hinglish use neerja or prabhat. Very long answers still come as text.</i>")
 
 
 async def _send_audio(m: Message, data: bytes, note: bool, title: str = "Ella") -> None:
@@ -314,7 +321,7 @@ async def voice_cmd(m: Message, command: CommandObject):
         voice_access.set_prefs(uid, on=arg == "on")
     elif arg in tts.VOICES:
         voice_access.set_prefs(uid, on=True, name=arg)
-        out = await tts.synth("Hi, main Ella hoon. Ab main isi awaaz mein baat karungi.", arg)
+        out = await tts.synth(tts.sample(arg), arg)
         if out:
             await _send_audio(m, out[0], out[1], arg)
     elif arg:
