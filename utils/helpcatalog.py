@@ -17,7 +17,7 @@ from game.rules import R
 # Commands for the owner / moderators. Never listed in the menu or in /help.
 STAFF = frozenset({
     "admin", "stats", "backup", "backupdb", "restoredb", "give", "take", "setbalance", "resetdiamonds", "ban", "unban", "mute",
-    "unmute", "userinfo", "logs", "maintenance", "broadcast", "syncusers", "emojiid", "seticon", "delicon", "aitest", "voice", "approvevoice", "removevoice", "drop",
+    "unmute", "userinfo", "logs", "maintenance", "broadcast", "syncusers", "emojiid", "seticon", "delicon", "aitest", "aivoice", "drop",
     "boss", "wordstats", "purgeadopted", "academyadvance", "academyreset",
     "gameban", "gameunban", "gamemute", "gameunmute", "botban", "botunban", "botmute", "botunmute",
 })
@@ -30,7 +30,7 @@ MENU = (
     "fish", "academy", "achievements",
 )
 # AI chat only works in groups, so /ask (and /settings) are listed in the group menu only
-GROUP_MENU_EXTRA = ("ask", "afk", "waifu", "whisper", "tagall", "q", "settings")
+GROUP_MENU_EXTRA = ("ask", "voices", "v", "afk", "waifu", "whisper", "tagall", "q", "settings")
 
 # name -> description ("{name}" / "{emoji}" are replaced with the bot's name / emoji)
 DESC_LIST: list[tuple[str, str]] = [
@@ -125,6 +125,8 @@ DESC_LIST: list[tuple[str, str]] = [
     ('dicktop', '🍆 Dick leaderboard: this group first, button for overall - names are clickable'),
     ('missions', '📜 Missions & achievements'),
     ('ask', '{emoji} Ask {name} anything (groups only)'),
+    ('voices', '🎙 Choose my voice - buttons appear, only you can press them'),
+    ('v', '🎙 /v <message> (or reply to a message with /v): I answer with a voice message - pick the voice with /voices (20 voice messages per hour)'),
     ('hug', '🤗 Hug someone (reply/@user)'),
     ('slap', '👋 Slap someone with a fish'),
     ('fish', '🎣 Go fishing for diamonds'),
@@ -391,7 +393,7 @@ CATEGORIES: list[tuple[str, list[str]]] = [
                          "fortune", "iq", "lucky", "rate", "waifu", "afk", "sex", "whisper", "tagall", "etagall", "welcomemsg", "leavemsg", "cancel", "members", "q", "@actions"]),
     ("Academy 🎓", ["enroll", "academy", "schedule", "study", "attend", "hangout", "rest", "club", "parttime", "exam", "grades", "classrank",
                       "rival", "rivalduel", "crush", "crushoff", "campuscouple", "campusdate", "clubs", "buddy", "adventure", "academyremind", "reportcard", "halloffame", "academyhelp"]),
-    ("🤖 AI Chat", ["ask"]),
+    ("🤖 AI Chat", ["ask", "voices", "v"]),
 ]
 OTHER = "📦 Other"
 

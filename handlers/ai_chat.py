@@ -11,7 +11,7 @@ from io import BytesIO
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command, CommandObject
-from aiogram.types import CallbackQuery, Message, MessageEntity
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, MessageEntity
 from aiogram.types import User as TgUser
 from sqlalchemy import select
 from aiogram.utils.chat_action import ChatActionSender
@@ -159,13 +159,12 @@ def _now_line() -> str:
             f"For other time zones or 'days until', calculate from this.]")
 
 
-def _context(m: Message, bot_id: int) -> str:
+def _context(m: Message, bot_id: int, voice: bool = False) -> str:
     """Tells the AI WHO is talking to her and WHAT message they tagged her on (the replied-to message), so she can read it
     and knows the people. Only for the model; it is not saved in the chat history. Names/text are untrusted: single line, clipped."""
     lines = [f"[Info for you, do not repeat it: the person talking to you is {_who(m.from_user)}.]", _now_line()]
-    if m.from_user and _voice_ok(m.from_user.id):             # her answer will be SPOKEN: write it in the voice's own language
-        on, vname = voice_access.prefs(m.from_user.id)
-        vid = tts.voice_id(vname) if on else ""
+    if voice and m.from_user:                                   # her answer will be SPOKEN: write it in the voice's own language
+        vid = tts.voice_id(voice_access.get_name(m.from_user.id))
         if vid.startswith(("en-US", "en-GB")):
             lines.append("[Your answer will be spoken aloud by an English voice: reply in plain English only, no Hindi/Hinglish words.]")
         elif vid.startswith("hi-"):
@@ -291,15 +290,70 @@ async def clear_cmd(m: Message, ai: ChatService | None):
     await m.reply("🧹 Done — I've forgotten our chat. Fresh start! 🦋")
 
 
-def _voice_ok(uid: int) -> bool:
-    return voice_access.allowed(uid, get_settings().owner_id)
+def _vlabel(key: str) -> str:
+    return f"{'♀' if 'woman' in tts.VOICES[key][1] else '♂'} {key.capitalize()}"
 
 
-def _voice_help(on: bool, name: str) -> str:
+def _voices_text(current: str) -> str:
     lst = "\n".join(f"<code>{k}</code> - {d}" for k, (_, d) in tts.VOICES.items())
-    return (f"🎙 Voice mode: <b>{'ON - I reply with voice only' if on else 'OFF'}</b>\nVoice: <b>{name}</b>\n\n"
-            f"<code>/voice on</code> · <code>/voice off</code> · <code>/voice &lt;name&gt;</code>\n"
-            f"Voices:\n{lst}\n\n<i>English-only voices read Hinglish badly: for Hinglish use neerja or prabhat. Very long answers still come as text.</i>")
+    return (f"🎙 <b>Choose my voice</b>\nOnly you can use these buttons. Now: <b>{current or tts.DEFAULT}</b>\n\n{lst}\n\n"
+            f"👉 <b>How to use:</b> type <code>/v</code> and then your message (or reply to a message with <code>/v</code>) "
+            f"and I will answer with a <b>voice message</b>. Normal chat stays text.\n"
+            f"<i>Limit: {voice_access.LIMIT} voice messages per hour. English-only voices read Hinglish badly, so for Hinglish pick Neerja or Prabhat.</i>")
+
+
+@router.message(Command("voices"))
+async def voices_cmd(m: Message):
+    """Shows the voice buttons. Only the person who typed /voices can press them."""
+    if not m.from_user:
+        return
+    uid = m.from_user.id
+    cur = voice_access.get_name(uid)
+    rows, row = [], []
+    for k in tts.VOICES:
+        row.append(InlineKeyboardButton(text=("✅ " if k == cur else "") + _vlabel(k), callback_data=f"vc:{uid}:{k}"))
+        if len(row) == 3:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    await m.reply(_voices_text(cur), reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+
+
+@router.callback_query(F.data.startswith("vc:"))
+async def voices_pick(cb: CallbackQuery):
+    try:
+        _, owner, key = cb.data.split(":", 2)
+        owner = int(owner)
+    except ValueError:
+        await cb.answer()
+        return
+    if cb.from_user.id != owner:                          # not your menu
+        await cb.answer("This menu is for the person who opened it. Type /voices to get your own 🙂", show_alert=True)
+        return
+    if key not in tts.VOICES or not await kv.set_nx(f"vc:{owner}", 4):      # unknown voice, or a double tap / spam: ignore
+        await cb.answer()
+        return
+    voice_access.set_name(owner, key)
+    await cb.answer(f"Voice set: {key.capitalize()} ✅")
+    try:                                                  # the same message turns into the confirmation; the buttons are gone, so no more taps
+        await cb.message.edit_text(
+            f"✅ Voice set: <b>{key.capitalize()}</b> ({tts.VOICES[key][1]})\n\n"
+            f"👉 Type <code>/v</code> and then your message (or reply to a message with <code>/v</code>) to get my answer as a voice message.\n"
+            f"<i>Limit: {voice_access.LIMIT} voice messages per hour. Use /voices to change the voice again.</i>", reply_markup=None)
+    except Exception:
+        log.debug("voices confirm edit failed", exc_info=True)
+
+
+@router.message(Command("aivoice"))
+async def aivoice_cmd(m: Message, command: CommandObject):
+    """Owner only: switch voice replies ON/OFF for everybody at once."""
+    if not m.from_user or m.from_user.id != get_settings().owner_id:
+        return
+    a = (command.args or "").strip().lower()
+    if a in ("on", "off"):
+        voice_access.set_enabled(a == "on")
+    await m.reply(f"🎙 Voice replies for everyone: <b>{'ON' if voice_access.enabled() else 'OFF'}</b>\n<code>/aivoice on</code> · <code>/aivoice off</code>")
 
 
 async def _send_audio(m: Message, data: bytes, note: bool, title: str = "Ella") -> None:
@@ -309,77 +363,25 @@ async def _send_audio(m: Message, data: bytes, note: bool, title: str = "Ella") 
         await m.reply_audio(BufferedInputFile(data, "ella.mp3"), title=title)
 
 
-@router.message(Command("voice"))
-async def voice_cmd(m: Message, command: CommandObject):
-    """Owner and people the owner approved: while ON, AI replies to YOU come as a voice note instead of text, until /voice off."""
-    if not m.from_user or not _voice_ok(m.from_user.id):
-        return
-    uid = m.from_user.id
-    arg = (command.args or "").strip().lower().split()[:1]
-    arg = arg[0] if arg else ""
-    if arg in ("on", "off"):
-        voice_access.set_prefs(uid, on=arg == "on")
-    elif arg in tts.VOICES:
-        voice_access.set_prefs(uid, on=True, name=arg)
-        out = await tts.synth(tts.sample(arg), arg)
-        if out:
-            await _send_audio(m, out[0], out[1], arg)
-    elif arg:
-        await m.reply("❌ Unknown voice. Send <code>/voice</code> to see the list.")
-        return
-    on, name = voice_access.prefs(uid)
-    await m.reply(_voice_help(on, name or tts.DEFAULT))
-
-
-async def _voice_target(m: Message, command: CommandObject) -> int | None:
-    toks = [t for t in (command.args or "").split() if t.startswith("@") or t.isdigit()]
-    target, _ = await resolve_target(m, toks)
-    return target
-
-
-@router.message(Command("approvevoice"))
-async def approvevoice_cmd(m: Message, command: CommandObject):
-    """Owner only: let someone use voice replies. Reply to them, or give @username / numeric id."""
-    if not m.from_user or m.from_user.id != get_settings().owner_id:
-        return
-    t = await _voice_target(m, command)
-    if t is None:
-        await m.reply("Who? Reply to their message, or write <code>/approvevoice @username</code> / numeric ID.")
-        return
-    msg = "✅ Voice access given." if voice_access.approve(t) else "They already have voice access."
-    await m.reply(f"{msg} They can now use <code>/voice</code>. ID: <code>{t}</code>")
-
-
-@router.message(Command("removevoice"))
-async def removevoice_cmd(m: Message, command: CommandObject):
-    """Owner only: take voice access away again."""
-    if not m.from_user or m.from_user.id != get_settings().owner_id:
-        return
-    t = await _voice_target(m, command)
-    if t is None:
-        ids = voice_access.approved_ids()
-        await m.reply("Who? Reply to their message or give @username / ID.\nApproved now: " + (", ".join(f"<code>{i}</code>" for i in ids) or "nobody"))
-        return
-    await m.reply("🗑 Voice access removed." if voice_access.remove(t) else "They didn't have voice access.")
-
-
-async def _speak(m: Message, answer: str) -> bool:
-    """Voice mode: send the answer as a voice note. True = sent (skip the text). Never raises; any failure -> False (text goes out)."""
+async def _speak(m: Message, answer: str) -> tuple[bool, str]:
+    """/v: send the answer as a voice message. Returns (sent, note). When not sent the caller sends the text, with `note` in front.
+    Never raises."""
     try:
-        if not m.from_user or not _voice_ok(m.from_user.id):
-            return False
-        on, name = voice_access.prefs(m.from_user.id)
-        if not on:
-            return False
-        out = await tts.synth(answer, name)
+        if not voice_access.enabled():
+            return False, "🔇 Voice replies are switched off right now, so here is text:"
+        uid = m.from_user.id
+        w = voice_access.wait_secs(uid)
+        if w:
+            return False, f"⏳ Voice limit reached ({voice_access.LIMIT} per hour). Voice is back in {dur(w)}; here is text:"
+        out = await tts.synth(answer, voice_access.get_name(uid))
         if not out:
-            await m.reply(f"⚠️ Voice failed, sending text instead: {tts.last_error}", parse_mode=None)
-            return False
+            return False, f"⚠️ Voice failed ({tts.last_error or 'unknown'}), here is text:"
         await _send_audio(m, out[0], out[1])
-        return True
+        voice_access.count(uid)
+        return True, ""
     except Exception:
         log.warning("voice reply failed", exc_info=True)
-        return False
+        return False, "⚠️ Voice failed, here is text:"
 
 
 @router.message(Command("aitest"))
@@ -450,7 +452,7 @@ async def _owner_command(m: Message, ai: ChatService, text: str) -> bool:
 
 
 async def _talk(m: Message, bot: Bot, ai: ChatService | None, text: str,
-                image: bytes | None = None, mime: str = "image/webp", sticker: bool = False) -> None:
+                image: bytes | None = None, mime: str = "image/webp", sticker: bool = False, voice: bool = False) -> None:
     if m.chat.type == "private":                    # AI chat is for groups only
         if await kv.set_nx(f"aidm:{m.from_user.id}", 60):
             await m.reply("💬 AI chat works only in <b>groups</b>. Add me to your group, then tag me, reply to me or say my name!\n"
@@ -481,7 +483,7 @@ async def _talk(m: Message, bot: Bot, ai: ChatService | None, text: str,
     try:
         async with ChatActionSender.typing(bot=bot, chat_id=m.chat.id):
             cands = {} if sticker else await _tag_candidates(m, bot.id, text)
-            answer = await ai.reply(m.from_user.id, m.chat.id, text, image, mime, context=_context(m, bot.id) + _tag_line(cands) + ("\n" if cands else ""))
+            answer = await ai.reply(m.from_user.id, m.chat.id, text, image, mime, context=_context(m, bot.id, voice) + _tag_line(cands) + ("\n" if cands else ""))
     except AIRateLimited as e:
         await _send(m, f"✋ Slow down a little — try again in {dur(e.retry_after)}.")
         return
@@ -497,8 +499,11 @@ async def _talk(m: Message, bot: Bot, ai: ChatService | None, text: str,
         return
     if sticker and answer.strip() == BLOCKED_REPLY:    # the AI's safety filter refused the picture (nudity etc.)
         answer = "🙈 Let's keep the stickers fun and clean here, please! 🦋"
-    if not sticker and await _speak(m, _with_tags(answer, cands)[0]):     # owner voice mode: voice instead of text
-        return
+    if voice:                                          # /v: the answer goes out as a voice message
+        sent, note = await _speak(m, _with_tags(answer, cands)[0])
+        if sent:
+            return
+        answer = f"{note}\n\n{answer}"
     for part in split_text(answer):
         part, ents = _with_tags(part, cands)
         await _send(m, part, parse_mode=None, **({"entities": ents} if ents else {}))   # model output is untrusted: plain text + only our own mention entities
@@ -508,6 +513,19 @@ async def _talk(m: Message, bot: Bot, ai: ChatService | None, text: str,
 async def ask_cmd(m: Message, command: CommandObject, bot: Bot, ai: ChatService | None):
     """Works in groups and DMs without needing a mention."""
     await _talk(m, bot, ai, (command.args or "").strip())
+
+
+@router.message(Command("v"))
+async def v_cmd(m: Message, command: CommandObject, bot: Bot, ai: ChatService | None):
+    """/v <message> (or reply to a message with /v): Ella answers with a voice message."""
+    text = (command.args or "").strip()
+    r = m.reply_to_message
+    if not text and r is not None:
+        text = _msg_text(r) if (r.text or r.caption) else ""
+    if not text:
+        await m.reply("🎙 Type <code>/v</code> and then your message, or reply to a message with <code>/v</code>.\nPick my voice with /voices.")
+        return
+    await _talk(m, bot, ai, text, voice=True)
 
 
 @router.message(F.text, ~F.text.startswith("/"))
