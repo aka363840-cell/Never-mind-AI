@@ -52,7 +52,7 @@ async def _ask(m: Message, action: str, args: dict, summary: str):
 async def admin_help(m: Message):
     await m.reply("🔧 <b>Admin</b> (" + adm.role(m.from_user.id) + ")\n/give /take /setbalance &lt;target&gt; &lt;amount&gt;\n/resetdiamonds &lt;amount&gt; (everyone's wallet = amount, owner)\n"
                   "/ban &lt;target&gt; [reason] · /unban · /mute · /unmute  (owner: no slash needed — reply with \"ban\" / \"mute\" / \"unban\")\n/userinfo &lt;target&gt; · /logs [n]\n"
-                  "/broadcast [forward] &lt;text&gt; · /syncusers · /maintenance on|off · /stats · /backupdb · /restoredb · /emojiid · /seticon · /delicon · /setstart dm|gc · /aitest (owner) · /drop · /boss (in groups)\n\nTarget = reply, @user or ID. Works in DM and in groups. State changes need a confirm tap.")
+                  "/broadcast [forward] &lt;text&gt; · /syncusers · /maintenance on|off · /stats · /backupdb · /restoredb · /emojiid · /seticon · /delicon · /setstart · /aitest (owner) · /drop · /boss (in groups)\n\nTarget = reply, @user or ID. Works in DM and in groups. State changes need a confirm tap.")
 
 
 @router.message(Command("stats"))
@@ -295,38 +295,30 @@ async def seticon_cmd(m: Message, command: CommandObject):
 
 @router.message(Command("setstart"))
 async def setstart_cmd(m: Message, command: CommandObject):
-    """Owner: /setstart dm|gc <text> (or reply to a text with /setstart dm|gc) · /setstart dm|gc reset · /setstart (show).
-    Changes only the /start message text; the buttons never change. {name} = user's name, {bot} = bot name."""
+    """Owner: /setstart <text> (or reply to a text with /setstart) · /setstart reset · /setstart (show status).
+    One text for the /start message in DM and groups; buttons never change. {name} = user's name, {bot} = bot name."""
     from database.models import AppState
     from database.session import db
     from handlers import views
     adm.authorize(m.from_user.id, "setstart")
-    usage = ("Usage: /setstart dm|gc &lt;text&gt; (or reply to a text)\n/setstart dm|gc reset\n"
-             "<code>{name}</code> = user's name · <code>{bot}</code> = bot name. Buttons stay unchanged. Max 1000 chars.")
-    raw = (command.args or "").strip()
-    which, _, rest = raw.partition(" ")
-    which, rest = which.lower(), rest.strip()
-    if which not in ("dm", "gc"):
-        cur = []
-        for k, label in (("dm", "DM"), ("gc", "Group")):
-            cur.append(f"{label}: {'custom' if await views.start_text(k == 'gc') else 'default'}")
-        raise GameError("ℹ️ " + " · ".join(cur) + "\n" + usage)
-    group = which == "gc"
-    key = views.start_key(group)
+    usage = ("Usage: /setstart &lt;text&gt; (or reply to a text with /setstart)\n/setstart reset\n"
+             "<code>{name}</code> = user's name · <code>{bot}</code> = bot name. Same text in DM and groups, buttons stay unchanged. Max 1000 chars.")
+    key = views.start_key(False)
+    rest = (command.args or "").strip()
     if rest.lower() == "reset":
         async with db.tx() as s:
             row = await s.get(AppState, key)
             if row:
                 await s.delete(row)
-        await m.reply(f"♻️ {which.upper()} start message reset to default."); return
+        await m.reply("♻️ Start message reset to default."); return
     src = m.reply_to_message
     if rest:
-        html = (m.html_text or "").split(None, 2)
-        text = html[2] if len(html) > 2 else rest
+        parts = (m.html_text or "").split(None, 1)
+        text = parts[1] if len(parts) > 1 else rest
     elif src is not None and (src.text or src.caption):
         text = src.html_text if src.text else (src.caption or "")
     else:
-        raise GameError(usage)
+        raise GameError(f"ℹ️ Start message: {'custom' if await views.start_text(False) else 'default'}\n" + usage)
     plain = re.sub(r"<[^>]+>", "", text)
     if len(plain) > 1000:
         raise GameError(f"❌ Too long ({len(plain)} chars, max 1000 - the DM start card is a video caption).")
@@ -336,7 +328,7 @@ async def setstart_cmd(m: Message, command: CommandObject):
             row.value = text
         else:
             s.add(AppState(key=key, value=text))
-    await m.reply(f"✅ {which.upper()} start message saved. Send /start to preview.")
+    await m.reply("✅ Start message saved (DM and groups). Send /start to preview.")
 
 
 @router.callback_query(F.data.startswith("adm:"))

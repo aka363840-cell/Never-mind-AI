@@ -47,7 +47,7 @@ async def welcome(first_name: str, group: bool = False, contacts: list[tuple[str
 
 
 def start_key(group: bool) -> str:
-    return "start_text_gc" if group else "start_text_dm"
+    return "start_text"                              # one text for both DM and group
 
 
 async def start_text(group: bool) -> str | None:
