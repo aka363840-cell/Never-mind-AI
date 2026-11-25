@@ -40,7 +40,24 @@ async def welcome(first_name: str, group: bool = False, contacts: list[tuple[str
             "🎓 Academy • 🛡 Group moderation\n\n"
             f"✨ And many more features!\n\n{line}\n\n"
             + ("👇 Press any button to get started." if group else "👇 Add me to your group and /start."))
+    custom = await start_text(group)
+    if custom:                                       # owner's /setstart text replaces the message only; buttons stay as they are
+        text = custom.replace("{name}", esc(first_name)).replace("{bot}", n)
     return text, (welcome_group_kb() if group else welcome_kb(contacts))
+
+
+def start_key(group: bool) -> str:
+    return "start_text_gc" if group else "start_text_dm"
+
+
+async def start_text(group: bool) -> str | None:
+    from database.models import AppState
+    try:
+        async with db.tx() as s:
+            row = await s.get(AppState, start_key(group))
+            return row.value if row and row.value else None
+    except Exception:
+        return None
 
 
 def welcome_group_kb() -> InlineKeyboardMarkup:
