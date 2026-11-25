@@ -22,6 +22,8 @@ log = logging.getLogger("ella.catalogue")
 
 SLUG_RX = re.compile(r"^[a-z0-9][a-z0-9_-]{0,80}$")
 MAX_FEED_BYTES = 15 * 1024 * 1024
+GP_FEED = "https://feeds.gamepix.com/v2/json"
+GP_NS_RX = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,75}$")
 UA = "EllaGaming/1.0 (Telegram Mini App; publisher-embed)"
 
 
@@ -47,6 +49,9 @@ class Catalogue:
     def __init__(self, st: Settings):
         self.st = st
         self.games: dict[str, dict] = {}
+        self._zip: list = []                         # raw GameZipper feed entries
+        self._gp: list = []                          # raw GamePix feed entries
+        self.gp_error = ""
         self.verdicts: dict[str, dict] = {}          # slug -> {verdict, reasons, warnings, ...} (filled by the scanner)
         self.fetched_at = 0.0
         self.etag = ""
@@ -88,25 +93,74 @@ class Catalogue:
         return {
             "slug": slug, "name": name.strip()[:80], "emoji": emoji[:8], "provider_category": pc.lower()[:30],
             "categories": categories.classify(pc, tags, name), "tags": tags, "embed_url": embed, "thumbnail": thumb or "",
+            "provider": "gamezipper",
+        }, ""
+
+    def _img_ok(self, url: object) -> str | None:
+        if not isinstance(url, str) or len(url) > 400:
+            return None
+        p = urlparse(url)
+        host = (p.hostname or "").lower()
+        if p.scheme != "https" or p.username or p.password or not host:
+            return None
+        for pat in self.st.image_hosts:
+            if host == pat or (pat.startswith("*.") and host.endswith(pat[1:])):
+                return url
+        return self._url_ok(url)
+
+    def normalise_gp(self, raw: object) -> tuple[dict | None, str]:
+        """One GamePix feed item. The embed URL is built from the validated namespace + our sid, not copied from the feed."""
+        if not isinstance(raw, dict) or not self.st.gamepix_sid:
+            return None, "not an object"
+        ns = raw.get("namespace")
+        if not isinstance(ns, str) or not GP_NS_RX.match(ns):
+            return None, "bad namespace"
+        slug = "gp-" + ns.lower().replace(".", "-")
+        if not SLUG_RX.match(slug):
+            return None, "bad slug"
+        title = raw.get("title")
+        if not isinstance(title, str) or not title.strip():
+            return None, "no name"
+        embed = self._url_ok(f"https://play.gamepix.com/{ns}/embed?sid={self.st.gamepix_sid}")
+        if not embed:
+            return None, "play.gamepix.com not an allowed host"
+        thumb = self._img_ok(raw.get("image")) or self._img_ok(raw.get("banner_image")) or ""
+        pc = raw.get("category") if isinstance(raw.get("category"), str) else ""
+        try:
+            q = float(raw.get("quality_score") or 0)
+        except (TypeError, ValueError):
+            q = 0.0
+        return {
+            "slug": slug, "name": title.strip()[:80], "emoji": "", "provider_category": pc.lower()[:30],
+            "categories": categories.classify(pc, [], title), "tags": [pc.lower()[:40]] if pc else [], "embed_url": embed,
+            "thumbnail": thumb, "provider": "gamepix", "quality": q,
         }, ""
 
     def load_list(self, data: object) -> None:
         if not isinstance(data, list):
             raise CatalogueError("feed is not a JSON array")
+        self._rebuild(data, self._gp)
+
+    def load_gamepix(self, items: list) -> None:
+        self._rebuild(self._zip, items)
+
+    def _rebuild(self, zip_raw: list, gp_raw: list) -> None:
         games: dict[str, dict] = {}
         bad: list[str] = []
         n_bad = 0
-        for i, raw in enumerate(data):
-            g, why = self.normalise(raw)
-            if g is None or g["slug"] in games:
-                n_bad += 1
-                if len(bad) < 15:
-                    bad.append(f"#{i}: {why or 'duplicate slug'}")
-                continue
-            games[g["slug"]] = g
+        for src, norm in ((zip_raw, self.normalise), (gp_raw, self.normalise_gp)):
+            for i, raw in enumerate(src):
+                g, why = norm(raw)
+                if g is None or g["slug"] in games:
+                    n_bad += 1
+                    if len(bad) < 15:
+                        bad.append(f"#{i}: {why or 'duplicate slug'}")
+                    continue
+                games[g["slug"]] = g
         if not games:
             raise CatalogueError("feed contained no usable games")
-        self.games, self.raw_count, self.invalid, self.invalid_count = games, len(data), bad, n_bad
+        self._zip, self._gp = zip_raw, gp_raw
+        self.games, self.raw_count, self.invalid, self.invalid_count = games, len(zip_raw) + len(gp_raw), bad, n_bad
         self._bump()
 
     def _bump(self) -> None:
@@ -117,6 +171,7 @@ class Catalogue:
     def load_disk_cache(self) -> bool:
         try:
             blob = json.loads(self.st.cache_path.read_text("utf-8"))
+            self._gp = list(blob.get("gamepix") or [])
             self.load_list(blob["games"])
             self.fetched_at, self.etag = float(blob.get("fetched_at", 0)), blob.get("etag", "")
             return True
@@ -124,10 +179,10 @@ class Catalogue:
             log.info("no usable catalogue disk cache (%s)", e)
             return False
 
-    def _save_disk_cache(self, data: list) -> None:
+    def _save_disk_cache(self) -> None:
         try:
             tmp = self.st.cache_path.with_suffix(".tmp")
-            tmp.write_text(json.dumps({"fetched_at": self.fetched_at, "etag": self.etag, "games": data}), "utf-8")
+            tmp.write_text(json.dumps({"fetched_at": self.fetched_at, "etag": self.etag, "games": self._zip, "gamepix": self._gp}), "utf-8")
             tmp.replace(self.st.cache_path)
         except OSError as e:
             log.warning("could not write catalogue cache: %s", e)
@@ -136,31 +191,66 @@ class Catalogue:
     def stale(self) -> bool:
         return time.time() - self.fetched_at > self.st.catalogue_ttl
 
+    def fetch_gamepix(self) -> list:
+        """Blocking. The highest-quality GamePix games first (order=quality), 96 per page, up to gamepix_max."""
+        out: list = []
+        seen: set[str] = set()
+        for page in range(1, 120):
+            q = urlencode({"sid": self.st.gamepix_sid, "order": "quality", "pagination": 96, "page": page})
+            status, _, body = http_get(f"{GP_FEED}?{q}", {"Accept": "application/json"})
+            if status != 200:
+                if out:
+                    break
+                raise CatalogueError(f"GamePix feed returned HTTP {status}")
+            items = json.loads(body.decode("utf-8")).get("items") or []
+            if not items:
+                break
+            for it in items:
+                ns = it.get("namespace") if isinstance(it, dict) else None
+                if isinstance(ns, str) and ns not in seen:
+                    seen.add(ns)
+                    out.append(it)
+            if len(out) >= self.st.gamepix_max:
+                break
+        return out[: self.st.gamepix_max]
+
     async def refresh(self, force: bool = False) -> bool:
-        """Fetch the feed if the cache is stale. On failure the previous catalogue keeps serving. Single-flight."""
+        """Fetch the feeds if the cache is stale. On failure the previous catalogue keeps serving. Single-flight."""
         async with self._lock:
             if not force and self.games and not self.stale:
                 return True
+            ok, errors = False, []
             try:
                 headers = {"Accept": "application/json"}
-                if self.etag and self.games:
+                if self.etag and self.games and self._zip:
                     headers["If-None-Match"] = self.etag
                 status, hdrs, body = await asyncio.to_thread(http_get, self.st.catalogue_url, headers)
-                if status == 304 and self.games:
-                    self.fetched_at = time.time()
-                    return True
-                if status != 200:
+                if status == 304 and self._zip:
+                    ok = True
+                elif status != 200:
                     raise CatalogueError(f"feed returned HTTP {status}")
-                data = json.loads(body.decode("utf-8"))
-                self.load_list(data)
-                self.fetched_at, self.etag, self.last_error = time.time(), hdrs.get("etag", ""), ""
-                await asyncio.to_thread(self._save_disk_cache, data)
-                log.info("catalogue refreshed: %d feed entries, %d usable, %d dropped", self.raw_count, len(self.games), self.invalid_count)
-                return True
+                else:
+                    self.load_list(json.loads(body.decode("utf-8")))
+                    self.etag, ok = hdrs.get("etag", ""), True
             except Exception as e:
-                self.last_error = f"{type(e).__name__}: {e}"[:300]
+                errors.append(f"{type(e).__name__}: {e}")
+            if self.st.gamepix_sid and self.st.gamepix_max > 0:
+                try:
+                    items = await asyncio.to_thread(self.fetch_gamepix)
+                    if items:
+                        self.load_gamepix(items)
+                        ok, self.gp_error = True, ""
+                except Exception as e:
+                    self.gp_error = f"{type(e).__name__}: {e}"[:300]
+                    errors.append("gamepix " + self.gp_error)
+            self.last_error = "; ".join(errors)[:300]
+            if not ok:
                 log.warning("catalogue refresh failed: %s", self.last_error)
                 return False
+            self.fetched_at = time.time()
+            await asyncio.to_thread(self._save_disk_cache)
+            log.info("catalogue refreshed: %d feed entries, %d usable, %d dropped", self.raw_count, len(self.games), self.invalid_count)
+            return True
 
     # ------------------------------------------------------------------------------------------------ eligibility
     def set_verdicts(self, rows: dict[str, dict]) -> None:
@@ -178,12 +268,17 @@ class Catalogue:
     def is_eligible(self, slug: str) -> bool:
         if slug not in self.games:
             return False
+        if self.games[slug].get("provider") == "gamepix":    # partner-approved embeds, not scanned
+            return True
         v = self.verdicts.get(slug, {}).get("verdict")
         if self.st.ads_policy == "show_all":      # list every embeddable game, ads or not (games may show provider ads)
             return not self._hard_blocked(slug)
         if self.st.ads_policy == "trust_provider":
             return v not in ("ads", "blocked")
         return v == "clean"
+
+    def scan_slugs(self) -> list[str]:
+        return [s for s, g in self.games.items() if g.get("provider") != "gamepix"]
 
     def eligible_slugs(self) -> list[str]:
         return [s for s in self.games if self.is_eligible(s)]
@@ -205,12 +300,15 @@ class Catalogue:
             "feed_entries_fetched": self.raw_count, "usable_entries": len(self.games), "dropped_invalid": self.invalid_count,
             "dropped_examples": self.invalid, "verdicts": by_verdict, "exclusion_reasons": reasons,
             "eligible_shown": len(self.eligible_slugs()), "ads_policy": self.st.ads_policy,
-            "eligible_per_category": per_cat, "fetched_at": int(self.fetched_at), "last_error": self.last_error,
+            "eligible_per_category": per_cat, "gamepix_games": sum(1 for g in self.games.values() if g.get("provider") == "gamepix"),
+            "gamepix_error": self.gp_error, "fetched_at": int(self.fetched_at), "last_error": self.last_error,
         }
 
     # ------------------------------------------------------------------------------------------------ public views
     def embed_url(self, slug: str) -> str:
         g = self.games[slug]
+        if g.get("provider") == "gamepix":
+            return g["embed_url"]
         sep = "&" if "?" in g["embed_url"] else "?"
         return g["embed_url"] + sep + urlencode({"utm_source": self.st.utm_source, "utm_medium": "embed", "utm_campaign": "ella-gaming"})
 

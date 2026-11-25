@@ -30,6 +30,10 @@ PRIMARY_MAP = {
     "arcade": "arcade", "skill": "arcade", "puzzle": "puzzle", "racing": "racing", "sports": "sports", "sport": "sports",
     "action": "action", "adventure": "adventure", "strategy": "strategy", "board": "board", "casual": "casual",
     "idle": "casual", "simulation": "casual", "multiplayer": "multiplayer", "card": "card", "word": "word",
+    # GamePix categories
+    "cards": "card", "driving": "racing", "shooting": "action", "shooter": "action", "fighting": "action", "rpg": "adventure",
+    "io": "multiplayer", "mahjong": "board", "bubble shooter": "puzzle", "match 3": "puzzle", "hidden object": "puzzle",
+    "quiz": "word", "trivia": "word", "football": "sports", "soccer": "sports", "basketball": "sports", "defense": "strategy",
 }
 
 # whole-word / phrase keywords found in tags or the name

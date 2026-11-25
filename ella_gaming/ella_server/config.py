@@ -62,6 +62,9 @@ class Settings:
     rate_auth_per_min: int
     rate_write_per_min: int
     utm_source: str                      # attribution host sent to GameZipper (publisher docs ask for it)
+    gamepix_sid: str = ""                # ELLA_GAMEPIX_SID - GamePix partner site id ("" = GamePix off; default 9HOS3 outside dev)
+    gamepix_max: int = 1500              # ELLA_GAMEPIX_MAX - how many of the highest-quality GamePix games to list
+    image_hosts: tuple[str, ...] = ("*.gamepix.com",)   # ELLA_IMAGE_HOSTS - extra hosts thumbnails may come from
     admin_ids: tuple[int, ...] = field(default_factory=tuple)   # ELLA_ADMIN_IDS - may read /api/admin/report
     dev: bool = False
 
@@ -94,6 +97,10 @@ def load() -> Settings:
         raise RuntimeError("ELLA_BOT_TOKEN is required to verify Telegram Mini App logins")
     data_dir = Path(os.getenv("ELLA_DATA_DIR", str(ROOT / "data"))).resolve()
     data_dir.mkdir(parents=True, exist_ok=True)
+    gp_sid = os.getenv("ELLA_GAMEPIX_SID", "" if dev else "9HOS3").strip()
+    embed_hosts = tuple(h.lower() for h in _list("ELLA_EMBED_HOSTS", "gamezipper.com"))
+    if gp_sid and "play.gamepix.com" not in embed_hosts:
+        embed_hosts += ("play.gamepix.com",)
     return Settings(
         bot_token=token,
         session_secret=secret,
@@ -103,7 +110,9 @@ def load() -> Settings:
         serve_frontend=_bool("ELLA_SERVE_FRONTEND", True),
         allowed_origins=_list("ELLA_ALLOWED_ORIGINS"),
         catalogue_url=os.getenv("ELLA_CATALOGUE_URL", "https://gamezipper.com/api/games.json").strip(),
-        embed_hosts=tuple(h.lower() for h in _list("ELLA_EMBED_HOSTS", "gamezipper.com")),
+        embed_hosts=embed_hosts,
+        gamepix_sid=gp_sid, gamepix_max=max(0, min(_int("ELLA_GAMEPIX_MAX", 1500), 6000)),
+        image_hosts=tuple(h.lower() for h in _list("ELLA_IMAGE_HOSTS", "*.gamepix.com")),
         catalogue_ttl=_int("ELLA_CATALOGUE_TTL", 6 * 3600),
         ads_policy=os.getenv("ELLA_ADS_POLICY", "show_all").strip().lower(),
         scan_ttl=_int("ELLA_SCAN_TTL", 7 * 86400),

@@ -319,7 +319,7 @@ async def api_not_found(request: Request):
 def csp(st: Settings) -> str:
     frames = " ".join(f"https://{h}" if not st.dev else f"http://{h} https://{h}" for h in st.embed_hosts)
     api = " ".join(st.allowed_origins) if not st.serve_frontend else ""
-    imgs = " ".join(f"https://{h}" if not st.dev else f"http://{h} https://{h}" for h in st.embed_hosts)
+    imgs = " ".join([f"https://{h}" if not st.dev else f"http://{h} https://{h}" for h in st.embed_hosts] + [f"https://{h}" for h in st.image_hosts])
     return "; ".join([
         "default-src 'none'",
         "script-src 'self' https://telegram.org",

@@ -259,7 +259,7 @@ class Scanner:
     def _due(self, checks: dict[str, dict]) -> list[str]:
         now = time.time()
         due = []
-        for slug in self.cat.games:
+        for slug in self.cat.scan_slugs():
             c = checks.get(slug)
             if not c:
                 due.append(slug)
@@ -283,7 +283,7 @@ class Scanner:
         self.running = True
         try:
             checks = await self.db.checks()
-            slugs = list(self.cat.games) if force else self._due(checks)
+            slugs = self.cat.scan_slugs() if force else self._due(checks)
             self.total, self.done = len(slugs), 0
             sem = asyncio.Semaphore(self.st.scan_concurrency)
             results: dict[str, dict] = {}
@@ -324,6 +324,6 @@ class Scanner:
         await self.load_verdicts()
 
     def status(self) -> dict:
-        unchecked = sum(1 for s in self.cat.games if s not in self.cat.verdicts)
+        unchecked = sum(1 for s in self.cat.scan_slugs() if s not in self.cat.verdicts)
         return {"running": self.running, "pending": max(unchecked, self.total - self.done if self.running else 0),
                 "browser_note": self.browser_note}
