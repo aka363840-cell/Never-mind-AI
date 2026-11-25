@@ -19,7 +19,7 @@ from aiogram.utils.chat_action import ChatActionSender
 from ai.gemini import BLOCKED_REPLY
 from ai.base import AIQuotaExceeded, AIRateLimited, AIUnavailable
 from ai.service import ChatService
-from ai import tts
+from ai import stt, tts
 from services import voiceaccess as voice_access
 from aiogram.types import BufferedInputFile
 from config import get_settings
@@ -562,6 +562,47 @@ async def _sticker_image(bot: Bot, st) -> tuple[bytes | None, str]:
     if not data or len(data) > MAX_STICKER_BYTES:
         return None, "image/webp"
     return data, ("image/webp" if data[:4] == b"RIFF" and data[8:12] == b"WEBP" else "image/jpeg")
+
+
+@router.message(F.voice | F.audio)
+async def voice_in(m: Message, bot: Bot, ai: ChatService | None, group=None):
+    """A voice note aimed at Ella (a reply to her message, or her @username in the caption) is turned into text and then goes through the
+    normal chat flow. Max AI_VOICE_MAX_SECONDS (60). The audio is only kept in memory while it is transcribed."""
+    if not m.from_user:
+        return
+    if m.chat.type == "private":                    # AI chat is groups-only: same notice as for text, and no transcription quota is spent
+        await _talk(m, bot, ai, "")
+        return
+    if group is not None and not group.ai_enabled:
+        return
+    me = await bot.me()
+    rep = m.reply_to_message
+    hit = bool(rep and rep.from_user and rep.from_user.id == me.id) or bool(m.caption and f"@{me.username}".lower() in m.caption.lower())
+    if not hit:
+        return
+    if ai is None:
+        await _talk(m, bot, ai, "hi")
+        return
+    media = m.voice or m.audio
+    limit = stt.max_seconds()
+    if (media.duration or 0) > limit:
+        await m.reply(f"🎙 That voice note is too long - please keep it under {limit} seconds.")
+        return
+    if (media.file_size or 0) > 5 * 1024 * 1024:
+        await m.reply("🎙 That file is too big for me to listen to.")
+        return
+    text = None
+    try:
+        async with ChatActionSender.typing(bot=bot, chat_id=m.chat.id):
+            buf = BytesIO()
+            await bot.download(media, destination=buf)
+            text = await stt.get(get_settings()).transcribe(buf.getvalue(), media.mime_type or "audio/ogg")
+    except Exception:
+        log.warning("voice note handling failed", exc_info=True)
+    if not text or not text.strip():
+        await m.reply("🎙 Couldn't hear that, please type it.")
+        return
+    await _talk(m, bot, ai, text.strip()[:get_settings().ai_max_input_chars])
 
 
 @router.message(F.sticker)

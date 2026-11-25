@@ -223,14 +223,14 @@ def _models_env(name: str, default: str) -> list[str]:
 # name -> (key env vars, OpenAI-compatible base url, model env var, default models). Model names change: edit *_MODELS in .env.
 _COMPAT = {
     "groq": (("GROQ_API_KEYS", "GROQ_API_KEY"), "https://api.groq.com/openai/v1", "GROQ_MODELS",
-             "openai/gpt-oss-120b,openai/gpt-oss-20b,qwen/qwen3.6-27b"),
+             "qwen/qwen3.8-27b,openai/gpt-oss-120b,openai/gpt-oss-20b"),
     "cerebras": (("CEREBRAS_API_KEYS", "CEREBRAS_API_KEY"), "https://api.cerebras.ai/v1", "CEREBRAS_MODELS",
                  "llama3.1-8b,qwen-3-235b-a22b-instruct-2507"),
     "openrouter": (("OPENROUTER_API_KEYS", "OPENROUTER_API_KEY"), "https://openrouter.ai/api/v1", "OPENROUTER_MODELS",
                    "openrouter/free,meta-llama/llama-3.3-70b-instruct:free"),
     "mistral": (("MISTRAL_API_KEYS", "MISTRAL_API_KEY"), "https://api.mistral.ai/v1", "MISTRAL_MODELS", "mistral-small-latest"),
 }
-DEFAULT_ORDER = "gemini,groq,cloudflare,cerebras,openrouter,mistral,custom"
+DEFAULT_ORDER = "gemini,groq"          # only these two by default; the others stay available through AI_PROVIDERS
 
 
 def build_provider(settings) -> AIProvider:
