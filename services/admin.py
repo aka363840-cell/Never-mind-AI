@@ -12,7 +12,7 @@ from services import economy, users
 from services.errors import GameError
 from services.kv import kv
 
-OWNER_ONLY = {"resetdiamonds", "give", "take", "setbalance", "broadcast", "syncusers", "maintenance", "stats", "backup", "emojiid", "seticon", "ban", "unban", "mute", "unmute"}
+OWNER_ONLY = {"resetdiamonds", "give", "take", "setbalance", "broadcast", "syncusers", "maintenance", "stats", "backup", "emojiid", "seticon", "setstart", "ban", "unban", "mute", "unmute"}
 DESTRUCTIVE = {"resetdiamonds", "give", "take", "setbalance", "ban", "broadcast", "maintenance"}
 
 
