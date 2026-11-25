@@ -64,19 +64,23 @@ async def ensure_scope(bot: Bot, chat_id: int, uid: int, group: bool) -> None:
         log.info("command menu for %s in %s not set yet: %s", uid, chat_id, e)
 
 
+BOT_SHORT_DESCRIPTION = "𝑬𝒍𝒍𝒂 ♡ — AI chat & voice, adventures, gaming, social connections & many more ! \n\n~ @NotThatPiyush ❤️"
+BOT_DESCRIPTION = (
+    "𝑬𝒍𝒍𝒂 ♡ — Not your usual bot.\n\n"
+    "» AI Chat and voice. \n"
+    "» Games, chaos, connections & endless possibilities.\n"
+    "» Explore. Compete. Connect. Create your own world.\n"
+    "» One bot. Infinite vibes.\n\n"
+    "Queries?? –  @NotThatPiyush"
+)
+
+
 async def refresh_commands(bot: Bot) -> None:
     """Re-publish every menu + the bot's 'About' texts (called at boot and whenever the bot is renamed in BotFather)."""
     _done.clear()
     await setup_commands(bot)
-    n = brand.name()
-    try:
-        await bot.set_my_short_description(
-            f"{n} — AI chat, adventures, gaming, social connections & many more ! \n\n~ @SexyPiyush ❤️"[:120])
-        await bot.set_my_description(
-            f"{n} — Not your usual bot.\n\n"
-            "» AI, games, chaos, connections & endless possibilities.\n"
-            "» Explore. Compete. Connect. Create your own world.\n"
-            "» One bot. Infinite vibes.\n\n"
-            "Queries?? –  @SexyPiyush")
+    try:                                               # hardcoded on purpose: never changes with a redeploy or a rename
+        await bot.set_my_short_description(BOT_SHORT_DESCRIPTION)
+        await bot.set_my_description(BOT_DESCRIPTION)
     except Exception:
         log.exception("could not set the bot description")
