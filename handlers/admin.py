@@ -295,21 +295,21 @@ async def seticon_cmd(m: Message, command: CommandObject):
 
 @router.message(Command("setstart"))
 async def setstart_cmd(m: Message, command: CommandObject):
-    """Owner: /setstart <text> = same text for DM and groups · /setstart dm|gc <text> = only that one.
+    """Owner: /setstart <text> (dm / gc after the command are accepted too): ONE text, shown in DM and groups.
     Reply to a text instead of typing it · /setstart [dm|gc] reset · /setstart = status. Buttons never change."""
     from database.models import AppState
     from database.session import db
     from handlers import views
     adm.authorize(m.from_user.id, "setstart")
-    usage = ("Usage:\n/setstart &lt;text&gt; - same text for DM and groups\n/setstart dm &lt;text&gt; - DM only\n"
-             "/setstart gc &lt;text&gt; - groups only\n/setstart [dm|gc] reset\nOr reply to a text with the command. "
+    usage = ("Usage:\n/setstart &lt;text&gt; - sets the start message (same in DM and groups)\n"
+             "/setstart reset\nOr reply to a text with the command. "
              "<code>{name}</code> = user's name · <code>{bot}</code> = bot name. Buttons stay unchanged. Max 1000 chars.")
     raw = (command.args or "").strip()
     first, _, tail = raw.partition(" ")
-    which = first.lower() if first.lower() in ("dm", "gc") else "all"
+    which = first.lower() if first.lower() in ("dm", "gc") else "all"   # dm / gc are just aliases: DM and group always share one text
     rest = tail.strip() if which != "all" else raw
-    label = {"all": "DM and group", "dm": "DM", "gc": "Group"}[which]
-    keys = [views.start_key(w) for w in (("all", "dm", "gc") if which == "all" else (which,))]
+    label = "DM and group"
+    keys = [views.start_key(w) for w in ("all", "dm", "gc")]
     if rest.lower() == "reset":
         async with db.tx() as s:
             for k in keys:
@@ -331,11 +331,10 @@ async def setstart_cmd(m: Message, command: CommandObject):
     if len(plain) > 1000:
         raise GameError(f"❌ Too long ({len(plain)} chars, max 1000 - the DM start card is a video caption).")
     async with db.tx() as s:
-        if which == "all":                       # a shared text replaces any DM-only / group-only one
-            for k in (views.start_key("dm"), views.start_key("gc")):
-                row = await s.get(AppState, k)
-                if row:
-                    await s.delete(row)
+        for k in keys[1:]:                       # drop old DM-only / group-only texts
+            old = await s.get(AppState, k)
+            if old:
+                await s.delete(old)
         row = await s.get(AppState, keys[0])
         if row:
             row.value = text

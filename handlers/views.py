@@ -51,14 +51,13 @@ def start_key(which: str = "all") -> str:
 
 
 async def start_text(group: bool) -> str | None:
-    """Custom /start text: the DM-only / group-only one wins, else the shared one, else None (default)."""
+    """Custom /start text: the shared text, else None (default)."""
     from database.models import AppState
     try:
         async with db.tx() as s:
-            for k in (start_key("gc" if group else "dm"), start_key("all")):
-                row = await s.get(AppState, k)
-                if row and row.value:
-                    return row.value
+            row = await s.get(AppState, start_key("all"))     # one shared text: DM and group always show the same
+            if row and row.value:
+                return row.value
     except Exception:
         pass
     return None
