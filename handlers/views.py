@@ -64,6 +64,20 @@ async def start_text(group: bool) -> str | None:
     return None
 
 
+def welcome_group_kb() -> InlineKeyboardMarkup:
+    return kb([[B(text="🎮 Open Menu (every feature)", callback_data="nav:main")],
+               [B(text="🛡 Moderation Help (every admin cmd)", callback_data="nav:modhelp")]])
+
+
+def welcome_kb(contacts: list[tuple[str, str]] | None = None) -> InlineKeyboardMarkup:
+    rows = []
+    if brand.username():
+        rows.append([B(text="➕ Add me to your group", url=brand.link("startgroup=true"))])
+    if contacts:
+        rows.append([B(text=t, url=u) for t, u in contacts])
+    return kb(rows)
+
+
 async def about() -> tuple[str, InlineKeyboardMarkup]:
     from sqlalchemy import func, select
     from database.models import GroupSetting
