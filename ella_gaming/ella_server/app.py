@@ -6,6 +6,7 @@ import contextlib
 import logging
 import re
 import sys
+import os
 import random
 import time
 from datetime import datetime
@@ -114,6 +115,15 @@ def cards(cat: Catalogue, slugs: list[str]) -> list[dict]:
 
 
 # ----------------------------------------------------------------------------------------------- routes
+async def ads_txt(request: Request):
+    """/ads.txt for ad partners (e.g. GamePix verifies it). The lines come from the ELLA_ADS_TXT variable (use \\n or real new lines),
+    so they can be changed in Railway without a new release."""
+    body = (os.getenv("ELLA_ADS_TXT", "") or "").replace("\\n", "\n").strip()
+    if not body:
+        return Response("# ads.txt not set\n", media_type="text/plain", status_code=404)
+    return Response(body + "\n", media_type="text/plain", headers={"Cache-Control": "no-cache"})
+
+
 async def healthz(request: Request):
     cat: Catalogue = request.app.state.cat
     sc = request.app.state.scanner
@@ -392,6 +402,7 @@ def create_app(st: Settings | None = None) -> Starlette:
 
     routes = [
         Route("/healthz", healthz),
+        Route("/ads.txt", ads_txt),
         Route("/api/auth/telegram", auth_telegram, methods=["POST"]),
         Route("/api/me", me, methods=["GET"]),
         Route("/api/me", patch_me, methods=["PATCH"]),
