@@ -26,11 +26,11 @@ STAFF = frozenset({
 MENU = (
     "start", "help", "rules", "profile", "bal", "daily", "weekly", "work", "crime", "rob", "pay", "deposit", "withdraw",
     "kill", "revenge", "revive", "duel", "protect", "bounty", "shop", "inventory", "hunt", "dungeon", "pet",
-    "clan", "top", "missions", "arcade", "spin", "slots", "tap", "crash", "marry", "family", "houses", "collect", "cd",
-    "fish", "academy", "achievements",
+    "clan", "top", "missions", "arcade", "spin", "slots", "marry", "family", "houses", "collect", "cd",
+    "fish", "academy", "achievements", "voices", "v",
 )
 # AI chat only works in groups, so /ask (and /settings) are listed in the group menu only
-GROUP_MENU_EXTRA = ("ask", "voices", "v", "afk", "waifu", "whisper", "tagall", "q", "settings")
+GROUP_MENU_EXTRA = ("ask", "tap", "crash", "afk", "waifu", "whisper", "tagall", "q", "settings")
 
 # name -> description ("{name}" / "{emoji}" are replaced with the bot's name / emoji)
 DESC_LIST: list[tuple[str, str]] = [
