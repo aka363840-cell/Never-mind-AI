@@ -40,22 +40,22 @@ async def welcome(first_name: str, group: bool = False, contacts: list[tuple[str
             "🎓 Academy • 🛡 Group moderation\n\n"
             f"✨ And many more features!\n\n{line}\n\n"
             + ("👇 Press any button to get started." if group else "👇 Add me to your group and /start."))
-    custom = await start_text(group)
+    custom = await start_text()
     if custom:                                       # owner's /setstart text replaces the message only; buttons stay as they are
         text = custom.replace("{name}", esc(first_name)).replace("{bot}", n)
     return text, (welcome_group_kb() if group else welcome_kb(contacts))
 
 
-def start_key(which: str = "all") -> str:
-    return "start_text" if which == "all" else f"start_text_{which}"     # all | dm | gc
+def start_key() -> str:
+    return "start_text"
 
 
-async def start_text(group: bool) -> str | None:
+async def start_text() -> str | None:
     """Custom /start text: the shared text, else None (default)."""
     from database.models import AppState
     try:
         async with db.tx() as s:
-            row = await s.get(AppState, start_key("all"))     # one shared text: DM and group always show the same
+            row = await s.get(AppState, start_key())     # one shared text: DM and group always show the same
             if row and row.value:
                 return row.value
     except Exception:

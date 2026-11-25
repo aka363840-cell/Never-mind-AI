@@ -52,7 +52,7 @@ async def _ask(m: Message, action: str, args: dict, summary: str):
 async def admin_help(m: Message):
     await m.reply("🔧 <b>Admin</b> (" + adm.role(m.from_user.id) + ")\n/give /take /setbalance &lt;target&gt; &lt;amount&gt;\n/resetdiamonds &lt;amount&gt; (everyone's wallet = amount, owner)\n"
                   "/ban &lt;target&gt; [reason] · /unban · /mute · /unmute  (owner: no slash needed — reply with \"ban\" / \"mute\" / \"unban\")\n/userinfo &lt;target&gt; · /logs [n]\n"
-                  "/broadcast [forward] &lt;text&gt; · /syncusers · /maintenance on|off · /stats · /backupdb · /restoredb · /emojiid · /seticon · /delicon · /setstart [dm|gc] · /aitest (owner) · /drop · /boss (in groups)\n\nTarget = reply, @user or ID. Works in DM and in groups. State changes need a confirm tap.")
+                  "/broadcast [forward] &lt;text&gt; · /syncusers · /maintenance on|off · /stats · /backupdb · /restoredb · /emojiid · /seticon · /delicon · /setstart · /aitest (owner) · /drop · /boss (in groups)\n\nTarget = reply, @user or ID. Works in DM and in groups. State changes need a confirm tap.")
 
 
 @router.message(Command("stats"))
@@ -295,52 +295,40 @@ async def seticon_cmd(m: Message, command: CommandObject):
 
 @router.message(Command("setstart"))
 async def setstart_cmd(m: Message, command: CommandObject):
-    """Owner: /setstart <text> (dm / gc after the command are accepted too): ONE text, shown in DM and groups.
-    Reply to a text instead of typing it · /setstart [dm|gc] reset · /setstart = status. Buttons never change."""
+    """Owner: /setstart <text> (or reply to a text with /setstart) · /setstart reset · /setstart = status.
+    One text for the /start message in DM and groups; buttons never change. {name} = user's name, {bot} = bot name."""
     from database.models import AppState
     from database.session import db
     from handlers import views
     adm.authorize(m.from_user.id, "setstart")
-    usage = ("Usage:\n/setstart &lt;text&gt; - sets the start message (same in DM and groups)\n"
-             "/setstart reset\nOr reply to a text with the command. "
+    usage = ("Usage:\n/setstart &lt;text&gt; (or reply to a text with /setstart)\n/setstart reset\n"
              "<code>{name}</code> = user's name · <code>{bot}</code> = bot name. Buttons stay unchanged. Max 1000 chars.")
-    raw = (command.args or "").strip()
-    first, _, tail = raw.partition(" ")
-    which = first.lower() if first.lower() in ("dm", "gc") else "all"   # dm / gc are just aliases: DM and group always share one text
-    rest = tail.strip() if which != "all" else raw
-    label = "DM and group"
-    keys = [views.start_key(w) for w in ("all", "dm", "gc")]
+    key = views.start_key()
+    rest = (command.args or "").strip()
     if rest.lower() == "reset":
         async with db.tx() as s:
-            for k in keys:
-                row = await s.get(AppState, k)
-                if row:
-                    await s.delete(row)
-        await m.reply(f"♻️ {label} start message reset."); return
+            row = await s.get(AppState, key)
+            if row:
+                await s.delete(row)
+        await m.reply("♻️ Start message reset to default."); return
     src = m.reply_to_message
     if rest:
-        n = 1 if which == "all" else 2                   # drop "/setstart" (and "dm"/"gc") from the formatted text
-        parts = (m.html_text or "").split(None, n)
-        text = parts[n] if len(parts) > n else rest
+        parts = (m.html_text or "").split(None, 1)
+        text = parts[1] if len(parts) > 1 else rest
     elif src is not None and (src.text or src.caption):
         text = src.html_text if src.text else (src.caption or "")
     else:
-        st = " · ".join(f"{n}: {'custom' if await views.start_text(g) else 'default'}" for n, g in (("DM", False), ("Group", True)))
-        raise GameError(f"ℹ️ {st}\n" + usage)
+        raise GameError(f"ℹ️ Start message: {'custom' if await views.start_text() else 'default'}\n" + usage)
     plain = re.sub(r"<[^>]+>", "", text)
     if len(plain) > 1000:
         raise GameError(f"❌ Too long ({len(plain)} chars, max 1000 - the DM start card is a video caption).")
     async with db.tx() as s:
-        for k in keys[1:]:                       # drop old DM-only / group-only texts
-            old = await s.get(AppState, k)
-            if old:
-                await s.delete(old)
-        row = await s.get(AppState, keys[0])
+        row = await s.get(AppState, key)
         if row:
             row.value = text
         else:
-            s.add(AppState(key=keys[0], value=text))
-    await m.reply(f"✅ {label} start message saved. Send /start to preview.")
+            s.add(AppState(key=key, value=text))
+    await m.reply("✅ Start message saved. Send /start to preview.")
 
 
 @router.callback_query(F.data.startswith("adm:"))
