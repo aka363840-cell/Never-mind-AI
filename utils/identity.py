@@ -60,7 +60,13 @@ def classify(text: str) -> str | None:
         return None
     if any(r.search(t) for r in _CODE):
         return "code"
-    if any(r.search(t) for r in _DEV):
+    for i, r in enumerate(_DEV):
+        if not r.search(t):
+            continue
+        # Pattern 2 ("your owner/developer") is a bare keyword match: in a longer sentence ("you appreciate your owner")
+        # it is a statement or instruction, not a question. Leave those to the AI identity check.
+        if i == 2 and len(t.split()) > 5:
+            continue
         return "dev"
     return None
 
