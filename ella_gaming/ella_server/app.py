@@ -9,6 +9,7 @@ import sys
 import os
 import random
 import time
+from pathlib import Path
 from datetime import datetime
 
 from starlette.applications import Starlette
@@ -116,9 +117,13 @@ def cards(cat: Catalogue, slugs: list[str]) -> list[dict]:
 
 # ----------------------------------------------------------------------------------------------- routes
 async def ads_txt(request: Request):
-    """/ads.txt for ad partners (e.g. GamePix verifies it). The lines come from the ELLA_ADS_TXT variable (use \\n or real new lines),
-    so they can be changed in Railway without a new release."""
+    """/ads.txt for ad partners (GamePix verifies it). ELLA_ADS_TXT (if set) wins, else the bundled ella_server/ads.txt."""
     body = (os.getenv("ELLA_ADS_TXT", "") or "").replace("\\n", "\n").strip()
+    if not body:
+        try:
+            body = (Path(__file__).with_name("ads.txt")).read_text("utf-8").strip()
+        except OSError:
+            body = ""
     if not body:
         return Response("# ads.txt not set\n", media_type="text/plain", status_code=404)
     return Response(body + "\n", media_type="text/plain", headers={"Cache-Control": "no-cache"})
