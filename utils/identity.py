@@ -14,14 +14,17 @@ _ROLE = r"(?:developer|dev|creator|owner|maker|author|programmer|coder|founder|a
 _DEV = [re.compile(p, re.I) for p in (
     rf"\bwho\b.{{0,25}}\b{_MAKE}\b.{{0,25}}\b{_YOU}\b",                 # who made you / who created this bot
     rf"\bwho(?:'s| is| r)?\b.{{0,15}}\b(?:your|ur|the bot'?s?|this bot'?s?)\b.{{0,10}}\b{_ROLE}\b",   # who is your developer
-    rf"\b(?:your|ur|tera|tumhara|tumhare|teri|aapka|apka|bot ka|bot ke)\b.{{0,12}}\b{_ROLE}\b",        # your developer / tera owner
-    rf"\b{_ROLE}\b.{{0,12}}\b(?:kaun|kon|kaun hai|kon hai|kaun h|kon h|who|name|batao|bata)\b",       # developer kaun hai
+    rf"\b{_ROLE}\b.{{0,12}}\b(?:kaun|kon|kaun hai|kon hai|kaun h|kon h|who|name)\b",                  # developer kaun hai
     rf"\b(?:kisne|kis ne|kisne ne|kon ne|kaun ne)\b.{{0,25}}\b{_MAKE}\b",                          # kisne banaya
     rf"\b{_MAKE}\b.{{0,10}}\b(?:kisne|kis ne|kon ne)\b",
     rf"\b(?:which|what)\b.{{0,15}}\b(?:company|model|ai|llm|gpt|engine)\b.{{0,25}}\b(?:you|u|are you|powers? you|behind you|use|using)\b",
     rf"\b(?:are|r)\s+(?:you|u)\b.{{0,12}}\b(?:chat\s?gpt|gpt|gemini|claude|llama|bard|copilot|deepseek|openai|anthropic|google)\b",
     rf"\b(?:behind|backend of)\s+(?:you|u|this bot)\b",
 )]
+# "your owner" / "tera developer" alone is NOT a question ("You appreciate your owner", "tera owner ko bata de"): it only counts as one
+# when the message also looks like asking (a ? or who/kaun/kya/name/batao...). Otherwise the tiny AI check decides.
+_DEV_WEAK = re.compile(rf"\b(?:your|ur|tera|tumhara|tumhare|teri|aapka|apka|bot ka|bot ke)\b.{{0,12}}\b{_ROLE}\b", re.I)
+_ASKING = re.compile(r"\?|\b(?:who|whos|kaun|kon|kya|kaha|name|naam|batao|bataiye|tell me|know|pata|which|kaise)\b", re.I)
 _CODE = [re.compile(p, re.I) for p in (
     r"\b(?:source\s?code|your code|ur code|bot code|the code|code of (?:you|this bot)|github|repo(?:sitory)?|script of)\b",
     r"\b(?:system\s?prompt|your prompt|ur prompt|your instructions?|initial prompt|hidden prompt|ignore (?:all |your )?(?:previous |prior )?instructions)\b",
@@ -61,6 +64,8 @@ def classify(text: str) -> str | None:
     if any(r.search(t) for r in _CODE):
         return "code"
     if any(r.search(t) for r in _DEV):
+        return "dev"
+    if _DEV_WEAK.search(t) and _ASKING.search(t) and len(t) <= 60:      # short question about "your owner / developer"
         return "dev"
     return None
 
