@@ -126,7 +126,7 @@ DESC_LIST: list[tuple[str, str]] = [
     ('missions', '📜 Missions & achievements'),
     ('ask', '{emoji} Ask {name} anything (groups only)'),
     ('voices', '🎙 Choose my voice - buttons appear, only you can press them'),
-    ('v', '🎙 /v <message> (or reply to a message with /v): I answer with a voice message - pick the voice with /voices (20 voice messages per hour)'),
+    ('v', '🎙 /v <message> (or reply to a message with /v): I answer with a voice message - pick the voice with /voices (10 voice messages per hour)'),
     ('hug', '🤗 Hug someone (reply/@user)'),
     ('slap', '👋 Slap someone with a fish'),
     ('fish', '🎣 Go fishing for diamonds'),

@@ -207,3 +207,13 @@ def test_voice_note_input_limit_is_10_per_hour_per_person(monkeypatch):
     assert v.in_wait_secs(1, 100.0 + 3601) == 0       # frees up after an hour
     monkeypatch.setenv("AI_VOICE_IN_PER_HOUR", "3")
     assert v.in_limit() == 3
+
+
+def test_v_voice_answer_limit_is_10_per_hour():
+    from services import voiceaccess as v
+    assert v.LIMIT == 10
+    v._used.clear()
+    for i in range(10):
+        assert v.wait_secs(5, 100.0 + i) == 0
+        v.count(5, 100.0 + i)
+    assert v.wait_secs(5, 200.0) > 3000 and v.wait_secs(6, 200.0) == 0

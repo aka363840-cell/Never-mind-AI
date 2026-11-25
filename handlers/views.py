@@ -600,7 +600,7 @@ async def academy_help(uid: int) -> tuple[str, InlineKeyboardMarkup]:
 def ai_info() -> tuple[str, InlineKeyboardMarkup]:
     return (f"{brand.line()}\n\n🤖 <b>Chat with {esc(brand.name())}</b>\n\nAI chat works in <b>groups</b>: tag me, reply to my message or say my name, in any language — I reply in the language you use. "
             "If you chat too fast I take a 2-minute break.\n\n"
-            "🎙 <b>Voice:</b> /voices lets you pick my voice, then <code>/v your message</code> makes me answer with a voice message (20 per hour).\n\n"
+            "🎙 <b>Voice:</b> /voices lets you pick my voice, then <code>/v your message</code> makes me answer with a voice message (10 per hour).\n\n"
             "<i>Chatting is just for fun: it never earns diamonds or affects the game.</i>"), kb([
                 [B(text="🧹 Clear my chat history", callback_data="ai:clear")], back()])
 

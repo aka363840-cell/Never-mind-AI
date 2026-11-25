@@ -11,7 +11,7 @@ from collections import deque
 from pathlib import Path
 
 log = logging.getLogger(__name__)
-LIMIT = 20                 # voice messages per person ...
+LIMIT = int(os.getenv("AI_VOICE_OUT_PER_HOUR", "10") or 10)    # voice messages per person ...
 WINDOW = 3600              # ... per hour
 _path = Path(os.getenv("DATA_DIR", "/data")) / "voice_access.json"
 _data: dict | None = None  # {"enabled": bool, "names": {"<uid>": "<voice>"}}
