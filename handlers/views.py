@@ -33,15 +33,14 @@ async def welcome(first_name: str, group: bool = False, contacts: list[tuple[str
     Group: just 2 hub buttons - between them they open every feature and every admin command, in the same message."""
     line = "━━━━━━━━━━━━━━━━"
     n = esc(brand.name())
-    head = (f"{banner()}\n\n💖 <b>Welcome, {esc(first_name)} !!</b>\n\n" if not group
-            else f"{banner()}\n\n💖 <b>Hey there, {esc(first_name)} !!</b>\n\n")
-    text = (head + f"I'm <b>{n}</b> {brand.EMOJI} — your AI, games &amp; social companion.\n\n{line}\n\n"
-            "• 🤖 AI chat and voice\n\n"
+    head = (f"💖 Welcome, {esc(first_name)} !!\n\n" if not group else f"💖 Hey there , {esc(first_name)} !!\n\n")
+    text = (head + f"I'm {n} {brand.EMOJI} — your AI, games &amp; social companion.\n\n{line}\n\n"
+            "• 🤖 AI chat and voice \n\n"
             "💎 Economy • 🗝 Adventures\n\n"
             "🐾 Pets • 💍 Family • 🎭 Social fun\n\n"
             "🎓 Academy • 🛡 Group moderation\n\n"
             f"✨ And many more features!\n\n{line}\n\n"
-            + ("👇 Press any button to continue !!" if group else "👇 Add me to your group and /start !!"))
+            + ("👇 Press any button to continue !!" if group else "👇 Add  me to your group and /start !!"))
     custom = await start_text()
     if custom:                                       # owner's /setstart text replaces the message only; buttons stay as they are
         text = custom.replace("{name}", esc(first_name)).replace("{bot}", n)
