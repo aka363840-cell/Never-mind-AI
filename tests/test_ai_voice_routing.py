@@ -193,3 +193,17 @@ def test_default_providers_are_only_gemini_and_groq_and_groq_models_are_in_order
     src = open("ai/service.py").read()
     assert 'DEFAULT_ORDER = "gemini,groq"' in src
     assert '"qwen/qwen3.8-27b,openai/gpt-oss-120b,openai/gpt-oss-20b"' in src
+
+
+def test_voice_note_input_limit_is_10_per_hour_per_person(monkeypatch):
+    from services import voiceaccess as v
+    monkeypatch.delenv("AI_VOICE_IN_PER_HOUR", raising=False)
+    v._in_used.clear()
+    for i in range(10):
+        assert v.in_wait_secs(1, 100.0 + i) == 0
+        v.in_count(1, 100.0 + i)
+    assert v.in_wait_secs(1, 200.0) > 3000            # the 11th note within the hour is refused
+    assert v.in_wait_secs(2, 200.0) == 0              # somebody else is not affected
+    assert v.in_wait_secs(1, 100.0 + 3601) == 0       # frees up after an hour
+    monkeypatch.setenv("AI_VOICE_IN_PER_HOUR", "3")
+    assert v.in_limit() == 3

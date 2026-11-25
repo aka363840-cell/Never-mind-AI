@@ -70,3 +70,27 @@ def wait_secs(uid: int, now: float | None = None) -> int:
 def count(uid: int, now: float | None = None) -> None:
     """Call once a voice message was really sent."""
     _used.setdefault(uid, deque()).append(time.time() if now is None else now)
+
+
+# ---- voice notes people SEND to Ella (each one costs a Whisper request): a separate hourly limit per person
+_in_used: dict[int, deque] = {}
+
+
+def in_limit() -> int:
+    try:
+        return max(1, int(os.getenv("AI_VOICE_IN_PER_HOUR", "10")))
+    except ValueError:
+        return 10
+
+
+def in_wait_secs(uid: int, now: float | None = None) -> int:
+    now = time.time() if now is None else now
+    q = _in_used.setdefault(uid, deque())
+    while q and now - q[0] >= WINDOW:
+        q.popleft()
+    return 0 if len(q) < in_limit() else int(WINDOW - (now - q[0])) + 1
+
+
+def in_count(uid: int, now: float | None = None) -> None:
+    """Call right before a voice note is transcribed (the request costs quota even if it fails)."""
+    _in_used.setdefault(uid, deque()).append(time.time() if now is None else now)

@@ -591,6 +591,11 @@ async def voice_in(m: Message, bot: Bot, ai: ChatService | None, group=None):
     if (media.file_size or 0) > 5 * 1024 * 1024:
         await m.reply("🎙 That file is too big for me to listen to.")
         return
+    w = voice_access.in_wait_secs(m.from_user.id)
+    if w:
+        await m.reply(f"🎙 Voice-note limit reached ({voice_access.in_limit()} per hour). Please type it, or try again in {dur(w)}.")
+        return
+    voice_access.in_count(m.from_user.id)
     text = None
     try:
         async with ChatActionSender.typing(bot=bot, chat_id=m.chat.id):
