@@ -585,10 +585,11 @@ async def voice_in(m: Message, bot: Bot, ai: ChatService | None, group=None):
         return
     media = m.voice or m.audio
     limit = stt.max_seconds()
-    if (media.duration or 0) > limit:
+    is_owner = m.from_user.id == get_settings().owner_id
+    if (media.duration or 0) > limit and not is_owner:
         await m.reply(f"🎙 That voice note is too long - please keep it under {limit} seconds.")
         return
-    if (media.file_size or 0) > 5 * 1024 * 1024:
+    if (media.file_size or 0) > 5 * 1024 * 1024 and not is_owner:
         await m.reply("🎙 That file is too big for me to listen to.")
         return
     w = voice_access.in_wait_secs(m.from_user.id)

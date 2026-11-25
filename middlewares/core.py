@@ -147,7 +147,7 @@ class CoreMiddleware(BaseMiddleware):
         if isinstance(event, Message) and (event.text or "").startswith("/") and admin_svc.role(tg.id) != "owner":
             if not await _command_allowed(tg.id, event):
                 return
-        if await kv.incr_window(f"thr:{tg.id}", R.command_rate_window_s) > R.command_rate_max:
+        if admin_svc.role(tg.id) != "owner" and await kv.incr_window(f"thr:{tg.id}", R.command_rate_window_s) > R.command_rate_max:
             if isinstance(event, CallbackQuery):
                 await safe_answer(event, "Slow down a little ✋")
             return

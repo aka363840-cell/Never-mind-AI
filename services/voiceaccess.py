@@ -11,6 +11,16 @@ from collections import deque
 from pathlib import Path
 
 log = logging.getLogger(__name__)
+
+
+def _is_owner(uid: int) -> bool:
+    try:
+        from config import get_settings
+        return bool(uid) and uid == get_settings().owner_id
+    except Exception:
+        return False
+
+
 LIMIT = int(os.getenv("AI_VOICE_OUT_PER_HOUR", "10") or 10)    # voice messages per person ...
 WINDOW = 3600              # ... per hour
 _path = Path(os.getenv("DATA_DIR", "/data")) / "voice_access.json"
@@ -60,6 +70,8 @@ def set_name(uid: int, name: str) -> None:
 
 def wait_secs(uid: int, now: float | None = None) -> int:
     """0 = this person may send another voice message now; otherwise seconds until the oldest one of the hour expires."""
+    if _is_owner(uid):
+        return 0
     now = time.time() if now is None else now
     q = _used.setdefault(uid, deque())
     while q and now - q[0] >= WINDOW:
@@ -84,6 +96,8 @@ def in_limit() -> int:
 
 
 def in_wait_secs(uid: int, now: float | None = None) -> int:
+    if _is_owner(uid):
+        return 0
     now = time.time() if now is None else now
     q = _in_used.setdefault(uid, deque())
     while q and now - q[0] >= WINDOW:
