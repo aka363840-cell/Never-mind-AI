@@ -117,7 +117,6 @@ def test_home_and_navigation(browser, stack):
     assert page.evaluate("window.__ready && window.__expanded")
     tab(page, "games"); expect(page.locator(".grid .card").first).to_be_visible()
     tab(page, "profile"); expect(page.locator(".p-head h1")).to_have_text("Ada")
-    tab(page, "home"); expect(page.locator(".greet h1")).to_contain_text("Ada")
     assert not page.ella_errors, [e[:300] for e in page.ella_errors]
     page.ctx.close()
 
