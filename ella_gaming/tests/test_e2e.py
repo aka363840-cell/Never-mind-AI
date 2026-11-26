@@ -102,16 +102,12 @@ def test_home_and_navigation(browser, stack):
     ella, _ = stack
     page = new_page(browser, ella)
     page.goto(ella.url)
-    expect(page.locator(".greet h1")).to_contain_text("Ada")                              # personalised greeting
-    expect(page.locator(".topbar .avatar")).to_be_visible()                                # avatar
-    expect(page.locator(".brand")).to_contain_text("Ella")
-    for title in ("Featured", "Categories", "Popular", "Favourites"):
-        expect(page.locator(".sec-head h2", has_text=title).first).to_be_visible()
-    expect(page.locator(".card.feat").first).to_be_visible()
-    expect(page.locator(".search input")).to_be_visible()
-    # bottom navigation: exactly Home / Games / Trending / Profile
+    expect(page.locator(".grid .card").first).to_be_visible()                              # opens on Home = the game list
+    expect(page.locator(".pentry")).to_be_visible()                                        # UNO / Ludo / Chess entry on top
+    expect(page.locator(".search input").first).to_be_visible()
+    # bottom navigation: exactly Home / Premium / Profile
     btns = page.locator("#nav .nav-btn")
-    assert btns.count() == 4 and [t.strip() for t in btns.all_inner_texts()] == ["Home", "Games", "Trending", "Profile"]
+    assert btns.count() == 3 and [t.strip() for t in btns.all_inner_texts()] == ["Home", "Premium", "Profile"]
     body = page.locator("body").inner_text().lower()
     assert "leaderboard" not in body and "stats" not in body
     assert page.evaluate("window.__ready && window.__expanded")
@@ -128,7 +124,7 @@ def test_games_catalogue_lazy_loading_search_categories(browser, stack):
     tab(page, "games")
     expect(page.locator(".grid .card").first).to_be_visible()
     assert page.locator(".grid .card").count() == 24                                       # first page only (lazy)
-    expect(page.locator(".count")).to_have_text("54 games")
+    expect(page.locator(".count")).to_have_text("57 games")              # 54 + UNO, Ludo, Chess
     for _ in range(6):                                                                     # scroll to trigger infinite loading
         page.mouse.wheel(0, 4000); page.wait_for_timeout(300)
     expect(page.locator(".grid .card")).to_have_count(54)
@@ -136,7 +132,7 @@ def test_games_catalogue_lazy_loading_search_categories(browser, stack):
     assert len(set(names)) == 54 and not any("Duplicate" in n or "Evil" in n for n in names)
     # search
     page.locator(".sticky .search input").fill("star")
-    expect(page.locator(".count")).not_to_have_text("54 games")
+    expect(page.locator(".count")).not_to_have_text("57 games")
     n = page.locator(".grid .card").count()
     assert 0 < n < 54 and page.locator(".grid .card .name").first.inner_text().lower().startswith("star")
     page.locator(".sticky .search input").fill("zzqq")
@@ -152,10 +148,7 @@ def test_games_catalogue_lazy_loading_search_categories(browser, stack):
         page.wait_for_timeout(100)
     assert 0 < page.locator(".grid .card").count() < 54
     page.locator(".chip", has_text="All").click()
-    expect(page.locator(".count")).to_have_text("54 games")
-    # home category tile -> filtered games
-    tab(page, "home"); page.locator(".cat", has_text="Puzzle").click()
-    expect(page.locator(".chip[aria-pressed=true]")).to_have_text("Puzzle")
+    expect(page.locator(".count")).to_have_text("57 games")              # 54 + UNO, Ludo, Chess
     assert not page.ella_errors, [e[:300] for e in page.ella_errors]
     page.ctx.close()
 
@@ -213,12 +206,6 @@ def test_play_game_touch_controls_no_ads_back_navigation_history(browser, stack)
     tab(page, "profile")
     expect(page.locator(".row").first).to_be_visible()
     expect(page.locator(".grid .card").first).to_be_visible()                              # favourite
-    tab(page, "home")
-    expect(page.locator(".sec-head h2", has_text="Continue playing")).to_be_visible()
-    page.reload()
-    expect(page.locator(".sec-head h2", has_text="Continue playing")).to_be_visible()      # survives reload (server-side)
-    expect(page.locator(".sec-head h2", has_text="Favourites")).to_be_visible()
-    expect(page.locator(".empty-card")).to_have_count(0)
     assert not page.ella_errors, [e[:300] for e in page.ella_errors]
     page.ctx.close()
 
@@ -266,12 +253,12 @@ def test_api_failure_shows_error_and_recovers(browser, stack):
             route.fulfill(status=503, body=json.dumps({"error": "catalogue_unavailable", "message": "The game catalogue is loading or temporarily unavailable."}), content_type="application/json")
         else:
             route.continue_()
-    page.route("**/api/home", handler)
+    page.route("**/api/games?*", handler)
     page.goto(ella.url)
     expect(page.locator(".state h3")).to_have_text("Can't load games")
     state["fail"] = False
     page.locator(".state .btn").click()
-    expect(page.locator(".card.feat").first).to_be_visible()
+    expect(page.locator(".grid .card").first).to_be_visible()
     page.ctx.close()
 
 
@@ -285,9 +272,9 @@ def test_expired_session_token_relogs_in_silently(browser, stack):
             route.fulfill(status=401, body=json.dumps({"error": "token_expired"}), content_type="application/json")
         else:
             route.continue_()
-    page.route("**/api/home", handler)
+    page.route("**/api/games?*", handler)
     page.goto(ella.url)
-    expect(page.locator(".card.feat").first).to_be_visible()
+    expect(page.locator(".grid .card").first).to_be_visible()
     assert sum(1 for r in page.ella_reqs if r.endswith("/api/auth/telegram")) == 2     # logged in again, transparently
     page.ctx.close()
 
@@ -312,7 +299,7 @@ def test_layout_on_small_android_no_horizontal_scroll(browser, stack):
     for device in ("Galaxy S9+", "Pixel 5", "iPad Mini"):
         page = new_page(browser, ella, device=device)
         page.goto(ella.url)
-        expect(page.locator(".card.feat").first).to_be_visible()
+        expect(page.locator(".grid .card").first).to_be_visible()
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"), device
         tab(page, "games"); expect(page.locator(".grid .card").first).to_be_visible()
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"), device
@@ -324,7 +311,7 @@ def test_screenshots_for_report(browser, stack):
     out = os.path.join(os.path.dirname(__file__), "..", "docs", "screens")
     os.makedirs(out, exist_ok=True)
     page = new_page(browser, ella)
-    page.goto(ella.url); expect(page.locator(".card.feat").first).to_be_visible(); page.wait_for_timeout(700)
+    page.goto(ella.url); expect(page.locator(".grid .card").first).to_be_visible(); page.wait_for_timeout(700)
     page.screenshot(path=f"{out}/home.png")
     tab(page, "games"); expect(page.locator(".grid .card").first).to_be_visible(); page.wait_for_timeout(500)
     page.screenshot(path=f"{out}/games.png")
@@ -359,7 +346,7 @@ def test_premium_refresh_and_resume(browser, stack):
     page.locator(".pg-top .ibtn").first.click()
     page.locator(".pg-top .ibtn").first.click()                       # close premium; nothing to resume after a deliberate Back
     page.reload()
-    expect(page.locator(".greet h1")).to_be_visible()
+    expect(page.locator(".sticky .search input")).to_be_visible()
     assert page.locator(".pg").count() == 0
     assert not page.ella_errors, [e[:300] for e in page.ella_errors]
 

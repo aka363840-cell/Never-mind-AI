@@ -1,7 +1,7 @@
 import { h, icon } from "./dom.js";
 import { tg } from "./tg.js";
 import { api, login, ApiError } from "./api.js";
-import { premiumEntry, openPremium, startParam, resumeParam } from "./premium.js?v=6";
+import { premiumEntry, openPremium, startParam, resumeParam } from "./premium.js?v=7";
 
 const $ = (s) => document.querySelector(s);
 const view = $("#view"), nav = $("#nav"), root = $("#overlay-root"), toastEl = $("#toast");
@@ -93,7 +93,7 @@ function section(title, body, more) {
 }
 
 // ------------------------------------------------------------------ navigation
-const TABS = [["games", "Games"], ["premium", "Trending"], ["profile", "Profile"]];
+const TABS = [["games", "Home"], ["premium", "Premium"], ["profile", "Profile"]];
 function buildNav() {
   nav.querySelectorAll(".nav-btn").forEach((b) => {
     const [id, label] = TABS.find((t) => t[0] === b.dataset.tab);
@@ -200,14 +200,14 @@ function renderGames(top = false) {
   const onQuery = (q) => { if (q === g.q) return; Object.assign(g, { q, items: [], total: 0, next: 0, error: null, done: false, gen: g.gen + 1 }); redraw(); loadMore(); };
   const sticky = h("div", { class: "sticky" }, searchBox(g.q, onQuery, onQuery), chipRow);
   const results = h("div", {});
-  view.replaceChildren(...(top ? [h("p", { class: "tagline" }, "Best games, picked by quality."), premiumEntry(PCTX)] : []), top ? searchBox(g.q, onQuery, onQuery) : sticky, results);
+  view.replaceChildren(...(top ? [h("p", { class: "tagline" }, "Best games, picked by quality."), premiumEntry(PCTX)] : [premiumEntry(PCTX)]), top ? searchBox(g.q, onQuery, onQuery) : sticky, results);
   if (!top) fill();
   if (!top && !S.cats.length) loadHome().then(() => { if (tok === renderToken) fill(); }).catch(() => {});
 
   function redraw() {
     const kids = [];
     if (g.verifying) kids.push(h("div", { class: "notice" }, `Still checking some games for ads (${g.verifying} left) - more will show up soon.`));
-    if (!g.loading && !g.error && g.done || g.items.length) kids.push(h("div", { class: "count" }, top && !g.q ? `${g.total + 3} premium games` : g.total === 1 ? "1 game" : `${g.total} games`));
+    if (!g.loading && !g.error && g.done || g.items.length) kids.push(h("div", { class: "count" }, top && !g.q ? `${g.total + 3} premium games` : !top && !g.q && !g.category ? `${g.total + 3} games` : g.total === 1 ? "1 game" : `${g.total} games`));
     if (g.items.length) kids.push(h("div", { class: "grid" }, g.items.map((x) => card(x))));
     if (g.loading && !g.items.length) kids.push(h("div", { class: "grid" }, skeletons(6)));
     if (g.error) kids.push(stateBox("offline", g.items.length ? "Couldn't load more" : "Can't load games", g.error, h("button", { class: "btn", onclick: () => { g.error = null; redraw(); loadMore(); } }, icon("refresh"), "Try again")));
@@ -269,7 +269,7 @@ function openPlayer(g) {
   const stage = h("div", { class: "p-stage" });
   const fsBtn = h("button", { class: "ib", "aria-label": "Fullscreen", hidden: true, onclick: toggleFs }, icon("expand"));
   const bar = h("div", { class: "p-bar" },
-    h("button", { class: "back", onclick: close }, icon("back"), "Games"), title, fsBtn,
+    h("button", { class: "back", onclick: close }, icon("back"), "Home"), title, fsBtn,
     h("button", { class: "ib", "aria-label": "Reload game", onclick: start }, icon("refresh")));
   const offline = h("div", { class: "offline", hidden: true }, h("span", {}, "Connection lost"), h("button", { onclick: () => { offline.hidden = true; start(); } }, "Reload game"));
   const el = h("div", { class: "player", role: "dialog", "aria-modal": "true", "aria-label": "Playing " + g.name }, bar, stage);

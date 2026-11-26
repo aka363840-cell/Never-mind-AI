@@ -92,7 +92,7 @@ export function openPremium(ctx, start) {
   function leaveView() { gen++; ctl && ctl.abort(); clearInterval(timer); lastRoom.clear(); room = null; board = null; tg.playing(false); hub(); }
 
   async function hub() {
-    put(hdr("Trending", "Play live with friends", close), h("div", { id: "mine" }),
+    put(hdr("Premium", "Play live with friends", close), h("div", { id: "mine" }),
       h("div", { class: "tiles" }, tile("uno", "House rules, UNO call, jump-in. Play friends or the computer.", fanArt()), tile("ludo", "Race four tokens home. Solo, teams or vs computer.", ludoArt()), tile("chess", "Full rules, clocks, takebacks. Duel a friend or the computer.", chessArt())),
       h("h3", { class: "sub" }, "Have an invite code?"),
       (() => { const inp = h("input", { maxlength: "5", placeholder: "CODE", "aria-label": "Table code", autocapitalize: "characters" });
