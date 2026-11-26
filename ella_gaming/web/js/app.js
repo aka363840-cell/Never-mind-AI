@@ -1,7 +1,7 @@
 import { h, icon } from "./dom.js";
 import { tg } from "./tg.js";
 import { api, login, ApiError } from "./api.js";
-import { premiumEntry, openPremium, startParam, resumeParam } from "./premium.js?v=5";
+import { premiumEntry, openPremium, startParam, resumeParam } from "./premium.js?v=6";
 
 const $ = (s) => document.querySelector(s);
 const view = $("#view"), nav = $("#nav"), root = $("#overlay-root"), toastEl = $("#toast");
@@ -92,7 +92,7 @@ function section(title, body, more) {
 }
 
 // ------------------------------------------------------------------ navigation
-const TABS = [["home", "Home"], ["games", "Games"], ["premium", "Premium"], ["profile", "Profile"]];
+const TABS = [["home", "Home"], ["games", "Games"], ["premium", "Trending"], ["profile", "Profile"]];
 function buildNav() {
   nav.querySelectorAll(".nav-btn").forEach((b) => {
     const [id, label] = TABS.find((t) => t[0] === b.dataset.tab);
