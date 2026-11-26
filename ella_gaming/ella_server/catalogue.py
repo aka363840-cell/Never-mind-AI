@@ -174,6 +174,8 @@ class Catalogue:
             self._gp = list(blob.get("gamepix") or [])
             self.load_list(blob["games"] if self.st.catalogue_url else [])
             self.fetched_at, self.etag = float(blob.get("fetched_at", 0)), blob.get("etag", "")
+            if self.st.gamepix_sid and blob.get("gp_max") != self.st.gamepix_max:
+                self.fetched_at = 0.0                # cache was made with another GamePix limit -> refresh on start
             return True
         except Exception as e:                       # missing/corrupt cache is fine
             log.info("no usable catalogue disk cache (%s)", e)
@@ -182,7 +184,7 @@ class Catalogue:
     def _save_disk_cache(self) -> None:
         try:
             tmp = self.st.cache_path.with_suffix(".tmp")
-            tmp.write_text(json.dumps({"fetched_at": self.fetched_at, "etag": self.etag, "games": self._zip, "gamepix": self._gp}), "utf-8")
+            tmp.write_text(json.dumps({"fetched_at": self.fetched_at, "etag": self.etag, "games": self._zip, "gamepix": self._gp, "gp_max": self.st.gamepix_max}), "utf-8")
             tmp.replace(self.st.cache_path)
         except OSError as e:
             log.warning("could not write catalogue cache: %s", e)
@@ -337,6 +339,7 @@ class Catalogue:
             return self._search_cache[key]
         tokens = [t for t in re.split(r"[^a-z0-9]+", q.lower()) if t][:6]
         scored: list[tuple[float, str, str]] = []
+        quality: dict[str, float] = {}
         for s in self.eligible_slugs():
             g = self.games[s]
             if category and category not in g["categories"]:
@@ -361,12 +364,13 @@ class Catalogue:
                 if score < 0:
                     continue
             scored.append((score, g["name"].lower(), s))
+            quality[s] = g.get("quality", 0.0)
         if tokens:
             scored.sort(key=lambda x: (-x[0], x[1]))
         elif sort == "popular" and popularity is not None:
             scored.sort(key=lambda x: (-popularity.get(x[2], 0), x[1]))
-        else:
-            scored.sort(key=lambda x: x[1])
+        else:                                        # default: best GamePix games first, then A-Z
+            scored.sort(key=lambda x: (-quality.get(x[2], 0.0), x[1]))
         res = [s for _, _, s in scored]
         if sort != "popular":
             self._search_cache[key] = res
@@ -377,5 +381,7 @@ class Catalogue:
         import random
         pool = [s for s in self.eligible_slugs() if self.games[s]["thumbnail"]]
         pool.sort()
+        pool.sort(key=lambda s: -self.games[s].get("quality", 0.0))
+        pool = pool[:max(n * 6, 60)]                 # shuffle among the best ones only
         random.Random(day if day is not None else int(time.time() // 86400)).shuffle(pool)
         return pool[:n]
