@@ -65,7 +65,7 @@ async def _render(name: str, user: User):
 PAGE_HELP = {
     "profile": ("Basics",), "balance": ("Economy", "Property"), "powers": ("Shop",), "shop": ("Shop",),
     "missions": ("Progress",), "combat": ("Combat",), "clan": ("Clans",), "pet": ("Adventure",), "realm": ("Adventure",),
-    "casino": ("Casino",), "fun": ("Social", "Games"), "family": ("Love",), "academy": ("Academy",), "ai": ("AI Chat",),
+    "casino": ("Casino",), "fun": ("Social", "Games", "Music"), "family": ("Love",), "academy": ("Academy",), "ai": ("AI Chat",),
     "arcade": ("Games",),
 }
 

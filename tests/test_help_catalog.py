@@ -69,7 +69,7 @@ def test_staff_commands_are_hidden_everywhere():
 
 def test_menu_is_short_valid_and_same_in_dm_and_group():
     dm, grp = H.menu("Bot", "*", False), H.menu("Bot", "*", True)
-    assert 20 <= len(dm) <= 40 and len(grp) <= 100
+    assert 20 <= len(dm) <= 60 and len(grp) <= 100
     assert [c for c, _ in grp][: len(dm)] == [c for c, _ in dm] and grp[-1][0] == "settings"
     assert "ask" not in {c for c, _ in dm} and "ask" in {c for c, _ in grp}    # AI chat only works in groups
     for c, d in grp:

@@ -28,12 +28,24 @@ MENU = (
     "kill", "revenge", "revive", "duel", "protect", "bounty", "shop", "inventory", "hunt", "dungeon", "pet",
     "clan", "top", "missions", "arcade", "spin", "slots", "marry", "family", "houses", "collect", "cd",
     "fish", "academy", "achievements", "voices", "v",
+    "mxplay", "mxstartplay", "mxqueue", "mxpause", "mxresume", "mxskip", "mxprevious", "mxshuffle", "mxloop", "mxstopplay", "mxseek",
 )
 # AI chat only works in groups, so /ask (and /settings) are listed in the group menu only
 GROUP_MENU_EXTRA = ("ask", "tap", "crash", "afk", "waifu", "whisper", "tagall", "q", "settings")
 
 # name -> description ("{name}" / "{emoji}" are replaced with the bot's name / emoji)
 DESC_LIST: list[tuple[str, str]] = [
+    ('mxplay', '🎵 Play a song or add it to the music queue'),
+    ('mxstartplay', '▶️ Start playing a song or YouTube/streaming link'),
+    ('mxqueue', '📜 View the current music queue'),
+    ('mxpause', '⏸️ Pause the currently playing song'),
+    ('mxresume', '▶️ Resume paused music'),
+    ('mxskip', '⏭️ Skip the current song'),
+    ('mxprevious', '⏮️ Play the previously played song'),
+    ('mxshuffle', '🔀 Shuffle upcoming songs in the queue'),
+    ('mxloop', '🔁 Toggle repeat mode'),
+    ('mxstopplay', '⏹️ Stop playback and clear the queue'),
+    ('mxseek', '⏩ Seek forward or backward to a specific timestamp'),
     ('start', '{emoji} Open the {name} menu'),
     ('sex', '💞 Ask someone for a cosy night in (they accept or reject); sometimes a cute baby appears (just for fun, not part of /family) 👶'),
     ('whisper', '🤫 Private message in a group: type @bot <username/userid> <text> - only that person can read it'),
@@ -394,6 +406,7 @@ CATEGORIES: list[tuple[str, list[str]]] = [
     ("Academy 🎓", ["enroll", "academy", "schedule", "study", "attend", "hangout", "rest", "club", "parttime", "exam", "grades", "classrank",
                       "rival", "rivalduel", "crush", "crushoff", "campuscouple", "campusdate", "clubs", "buddy", "adventure", "academyremind", "reportcard", "halloffame", "academyhelp"]),
     ("🤖 AI Chat", ["ask", "voices", "v"]),
+    ("🎵 Music", ["mxplay", "mxstartplay", "mxqueue", "mxpause", "mxresume", "mxskip", "mxprevious", "mxshuffle", "mxloop", "mxstopplay", "mxseek"]),
 ]
 OTHER = "📦 Other"
 
