@@ -64,10 +64,10 @@ async def ensure_scope(bot: Bot, chat_id: int, uid: int, group: bool) -> None:
         log.info("command menu for %s in %s not set yet: %s", uid, chat_id, e)
 
 
-BOT_SHORT_DESCRIPTION = "𝑬𝒍𝒍𝒂 ♡ — AI chat & voice, adventures, gaming, social connections & many more ! \n\n~ @NotThatPiyush ❤️"
+BOT_SHORT_DESCRIPTION = "𝑬𝒍𝒍𝒂 ♡ — AI chat, voice & music, adventures, gaming, social & more ! \n\n~ @NotThatPiyush ❤️"
 BOT_DESCRIPTION = (
     "𝑬𝒍𝒍𝒂 ♡ — Not your usual bot.\n\n"
-    "» AI Chat and voice. \n"
+    "» AI Chat, voice and music. \n"
     "» Games, chaos, connections & endless possibilities.\n"
     "» Explore. Compete. Connect. Create your own world.\n"
     "» One bot. Infinite vibes.\n\n"
