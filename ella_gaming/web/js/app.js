@@ -8,7 +8,7 @@ const view = $("#view"), nav = $("#nav"), root = $("#overlay-root"), toastEl = $
 
 const CAT_NAMES = { arcade: "Arcade", puzzle: "Puzzle", racing: "Racing", sports: "Sports", action: "Action", adventure: "Adventure", strategy: "Strategy", board: "Board Games", casual: "Casual", multiplayer: "Multiplayer", card: "Card", word: "Word" };
 const S = {
-  tab: "home", player: null, favs: new Set(), cats: [], home: null, homeAt: 0, homeDirty: true, scroll: {},
+  tab: "games", player: null, favs: new Set(), cats: [], home: null, homeAt: 0, homeDirty: true, scroll: {},
   games: { q: "", category: "", items: [], total: 0, next: 0, loading: false, error: null, gen: 0, verifying: 0, done: false },
   top: { q: "", category: "", items: [], total: 0, next: 0, loading: false, error: null, gen: 0, verifying: 0, done: false },
 };
@@ -93,7 +93,7 @@ function section(title, body, more) {
 }
 
 // ------------------------------------------------------------------ navigation
-const TABS = [["home", "Home"], ["games", "Games"], ["premium", "Trending"], ["profile", "Profile"]];
+const TABS = [["games", "Games"], ["premium", "Trending"], ["profile", "Profile"]];
 function buildNav() {
   nav.querySelectorAll(".nav-btn").forEach((b) => {
     const [id, label] = TABS.find((t) => t[0] === b.dataset.tab);
@@ -103,10 +103,10 @@ function buildNav() {
   nav.hidden = false;
 }
 function syncNav() { nav.querySelectorAll(".nav-btn").forEach((b) => { if (b.dataset.tab === S.tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); }); }
-function syncBack() { tg.setBack(layers.length || S.tab !== "home" ? goBack : null); }
+function syncBack() { tg.setBack(layers.length || S.tab !== "games" ? goBack : null); }
 function goBack() {
   if (layers.length) { layers[layers.length - 1](); return; }
-  if (S.tab !== "home") setTab("home");
+  if (S.tab !== "games") setTab("games");
 }
 function pushLayer(closeFn) { layers.push(closeFn); syncBack(); }
 function popLayer(closeFn) { layers = layers.filter((f) => f !== closeFn); syncBack(); }
@@ -324,7 +324,7 @@ function openPlayer(g) {
     window.removeEventListener("offline", onOffline); window.removeEventListener("online", onOnline); window.removeEventListener("pagehide", onHide);
     document.removeEventListener("fullscreenchange", syncFs);
     popLayer(close); S.homeDirty = true;
-    if (S.tab === "home") renderHome();
+
   }
   window.addEventListener("offline", onOffline); window.addEventListener("online", onOnline); window.addEventListener("pagehide", onHide);
   document.addEventListener("fullscreenchange", syncFs); tg.onFullscreenChange(syncFs);
@@ -384,7 +384,7 @@ async function boot() {
     else gate("Can't sign in", errMsg(e), boot);
     return;
   }
-  buildNav(); setTab("home");
+  buildNav(); setTab("games");
   const sp = startParam() || resumeParam(); if (sp) openPremium(PCTX, sp);
 }
 boot();
