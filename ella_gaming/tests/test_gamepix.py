@@ -22,3 +22,13 @@ def test_gamepix_items(tmp_path, monkeypatch):
     assert c.embed_url("gp-stack-ball") == "https://play.gamepix.com/Stack-Ball/embed?sid=9HOS3"
     assert set(c.eligible_slugs()) == set(c.games) and c.scan_slugs() == []
     assert "play.gamepix.com" in c.st.embed_hosts
+
+
+def test_trending_is_best_first(tmp_path, monkeypatch):
+    monkeypatch.setenv("ELLA_TOP_COUNT", "2")
+    c = _cat(tmp_path, monkeypatch)
+    img = "https://img.gamepix.com/a.png"
+    c.load_gamepix([{"namespace": f"g{i}", "title": f"Game {i}", "category": "arcade", "image": img, "quality_score": q}
+                    for i, q in enumerate([3, 9, 5, 7])])
+    assert c.top_slugs() == ["gp-g1", "gp-g3"]
+    assert c.search()[:3] == ["gp-g1", "gp-g3", "gp-g2"]

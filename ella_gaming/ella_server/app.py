@@ -192,6 +192,9 @@ def _loaded(request: Request) -> Catalogue:
     return cat
 
 
+PREMIUM_OWN = 3                                          # our own tables: UNO, Ludo, Chess (counted in the totals)
+
+
 async def home(request: Request):
     limit_ip(request)
     uid = await authed(request)
@@ -218,7 +221,7 @@ async def home(request: Request):
         "recent": cards(cat, [r["slug"] for r in recent])[:12],
         "favorites": cards(cat, favs)[:12], "favorite_slugs": favs,
         "categories": [{**c, "count": counts[c["id"]]} for c in categories.CATEGORIES],
-        "total_games": len(cat.eligible_slugs()), "verifying": sc.status()["pending"] if sc.running else 0,
+        "total_games": len(cat.eligible_slugs()) + PREMIUM_OWN, "premium_total": len(cat.top_slugs()) + PREMIUM_OWN, "verifying": sc.status()["pending"] if sc.running else 0,
     }, headers={"Cache-Control": "private, no-store"})
 
 
@@ -236,6 +239,10 @@ async def games(request: Request):
     offset, limit = int_param(request, "offset", 0, 0, 100000), int_param(request, "limit", 24, 1, 48)
     pop = await request.app.state.db.popularity() if sort == "popular" else None
     found = cat.search(q, category, sort, pop)
+    if request.query_params.get("top") == "1":           # Trending tab: only the best games, best first
+        top = cat.top_slugs()
+        rank = {s: i for i, s in enumerate(top)}
+        found = sorted((s for s in found if s in rank), key=lambda s: rank[s]) if not q else [s for s in found if s in rank]
     sc: Scanner = request.app.state.scanner
     return JSONResponse({"items": [cat.card(s) for s in found[offset:offset + limit]], "total": len(found),
                          "next_offset": offset + limit if offset + limit < len(found) else None,

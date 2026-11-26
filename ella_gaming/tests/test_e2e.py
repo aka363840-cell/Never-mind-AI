@@ -344,6 +344,7 @@ def test_premium_refresh_and_resume(browser, stack):
     page = new_page(browser, ella)
     page.goto(ella.url)
     tab(page, "premium")
+    page.locator(".pentry").click()
     page.locator(".tile.ludo .go").click()
     page.get_by_text("🤖 Add computer").click()
     page.get_by_role("button", name="Start game").click()
@@ -370,6 +371,7 @@ def test_premium_vs_computer(browser, stack):
     page = new_page(browser, ella)
     page.goto(ella.url)
     tab(page, "premium")
+    page.locator(".pentry").click()
     shots = os.environ.get("PG_SHOTS")
 
     def snap(name):

@@ -286,6 +286,14 @@ class Catalogue:
     def scan_slugs(self) -> list[str]:
         return [s for s, g in self.games.items() if g.get("provider") != "gamepix"]
 
+    def top_slugs(self) -> list[str]:
+        """The Trending tab: the highest-quality games that have a thumbnail (GamePix quality_score)."""
+        if self.st.top_count <= 0:
+            return []
+        pool = [s for s in self.eligible_slugs() if self.games[s].get("quality", 0) > 0 and self.games[s]["thumbnail"]]
+        pool.sort(key=lambda s: (-self.games[s]["quality"], self.games[s]["name"].lower()))
+        return pool[: self.st.top_count]
+
     def eligible_slugs(self) -> list[str]:
         return [s for s in self.games if self.is_eligible(s)]
 

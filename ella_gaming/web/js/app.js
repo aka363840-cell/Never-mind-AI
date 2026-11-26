@@ -10,6 +10,7 @@ const CAT_NAMES = { arcade: "Arcade", puzzle: "Puzzle", racing: "Racing", sports
 const S = {
   tab: "home", player: null, favs: new Set(), cats: [], home: null, homeAt: 0, homeDirty: true, scroll: {},
   games: { q: "", category: "", items: [], total: 0, next: 0, loading: false, error: null, gen: 0, verifying: 0, done: false },
+  top: { q: "", category: "", items: [], total: 0, next: 0, loading: false, error: null, gen: 0, verifying: 0, done: false },
 };
 let sheetClose = null;
 let layers = [];          // open overlays, top = last; each entry closes itself
@@ -97,7 +98,7 @@ function buildNav() {
   nav.querySelectorAll(".nav-btn").forEach((b) => {
     const [id, label] = TABS.find((t) => t[0] === b.dataset.tab);
     b.replaceChildren(icon(id), h("span", {}, label));
-    b.addEventListener("click", () => { tg.haptic("light"); closeAllLayers(); if (id === "premium") openPremium(PCTX); else setTab(id); });
+    b.addEventListener("click", () => { tg.haptic("light"); closeAllLayers(); setTab(id); });
   });
   nav.hidden = false;
 }
@@ -115,7 +116,7 @@ function setTab(tab) {
   S.scroll[S.tab] = window.scrollY;
   S.tab = tab; syncNav(); syncBack();
   renderToken++;
-  ({ home: renderHome, games: renderGames, profile: renderProfile })[tab]();
+  ({ home: renderHome, games: () => renderGames(), premium: () => renderGames(true), profile: renderProfile })[tab]();
   if (tab !== "home") requestAnimationFrame(() => window.scrollTo(0, S.scroll[tab] || 0)); else window.scrollTo(0, S.scroll.home || 0);
 }
 
@@ -187,8 +188,8 @@ function goGames({ q = "", category = "" }) {
 }
 
 // ------------------------------------------------------------------ GAMES
-function renderGames() {
-  const g = S.games, tok = renderToken;
+function renderGames(top = false) {
+  const g = top ? S.top : S.games, tok = renderToken;
   const chipRow = h("div", { class: "chips", role: "group", "aria-label": "Categories" });
   const fill = () => {
     const cats = (S.cats.length ? S.cats : Object.entries(CAT_NAMES).map(([id, name]) => ({ id, name, count: 1 }))).filter((c) => c.count > 0);
@@ -199,14 +200,14 @@ function renderGames() {
   const onQuery = (q) => { if (q === g.q) return; Object.assign(g, { q, items: [], total: 0, next: 0, error: null, done: false, gen: g.gen + 1 }); redraw(); loadMore(); };
   const sticky = h("div", { class: "sticky" }, searchBox(g.q, onQuery, onQuery), chipRow);
   const results = h("div", {});
-  view.replaceChildren(sticky, results);
-  fill();
-  if (!S.cats.length) loadHome().then(() => { if (tok === renderToken) fill(); }).catch(() => {});
+  view.replaceChildren(...(top ? [h("p", { class: "tagline" }, "Best games, picked by quality."), premiumEntry(PCTX)] : []), top ? searchBox(g.q, onQuery, onQuery) : sticky, results);
+  if (!top) fill();
+  if (!top && !S.cats.length) loadHome().then(() => { if (tok === renderToken) fill(); }).catch(() => {});
 
   function redraw() {
     const kids = [];
     if (g.verifying) kids.push(h("div", { class: "notice" }, `Still checking some games for ads (${g.verifying} left) - more will show up soon.`));
-    if (!g.loading && !g.error && g.done || g.items.length) kids.push(h("div", { class: "count" }, g.total === 1 ? "1 game" : `${g.total} games`));
+    if (!g.loading && !g.error && g.done || g.items.length) kids.push(h("div", { class: "count" }, top && !g.q ? `${g.total + 3} premium games` : g.total === 1 ? "1 game" : `${g.total} games`));
     if (g.items.length) kids.push(h("div", { class: "grid" }, g.items.map((x) => card(x))));
     if (g.loading && !g.items.length) kids.push(h("div", { class: "grid" }, skeletons(6)));
     if (g.error) kids.push(stateBox("offline", g.items.length ? "Couldn't load more" : "Can't load games", g.error, h("button", { class: "btn", onclick: () => { g.error = null; redraw(); loadMore(); } }, icon("refresh"), "Try again")));
@@ -223,7 +224,7 @@ function renderGames() {
     const gen = g.gen; g.loading = true; redraw();
     try {
       const p = { limit: "24", offset: String(g.next || 0) };
-      if (g.q) p.q = g.q; if (g.category) p.category = g.category;
+      if (g.q) p.q = g.q; if (g.category) p.category = g.category; if (top) p.top = "1";
       const r = await api.games(p);
       if (gen !== g.gen) return;
       g.items.push(...r.items); g.total = r.total; g.next = r.next_offset; g.done = r.next_offset == null; g.verifying = r.verifying || 0;
