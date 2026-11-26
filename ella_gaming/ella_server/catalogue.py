@@ -172,7 +172,7 @@ class Catalogue:
         try:
             blob = json.loads(self.st.cache_path.read_text("utf-8"))
             self._gp = list(blob.get("gamepix") or [])
-            self.load_list(blob["games"])
+            self.load_list(blob["games"] if self.st.catalogue_url else [])
             self.fetched_at, self.etag = float(blob.get("fetched_at", 0)), blob.get("etag", "")
             return True
         except Exception as e:                       # missing/corrupt cache is fine
@@ -221,6 +221,8 @@ class Catalogue:
                 return True
             ok, errors = False, []
             try:
+                if not self.st.catalogue_url:
+                    raise StopIteration            # GameZipper is off
                 headers = {"Accept": "application/json"}
                 if self.etag and self.games and self._zip:
                     headers["If-None-Match"] = self.etag
@@ -232,6 +234,8 @@ class Catalogue:
                 else:
                     self.load_list(json.loads(body.decode("utf-8")))
                     self.etag, ok = hdrs.get("etag", ""), True
+            except StopIteration:
+                pass
             except Exception as e:
                 errors.append(f"{type(e).__name__}: {e}")
             if self.st.gamepix_sid and self.st.gamepix_max > 0:

@@ -47,7 +47,7 @@ class Settings:
     web_dir: Path                        # frontend files (served by this service unless hosted elsewhere)
     serve_frontend: bool                 # ELLA_SERVE_FRONTEND
     allowed_origins: tuple[str, ...]     # ELLA_ALLOWED_ORIGINS - only needed when the frontend is hosted elsewhere
-    catalogue_url: str                   # ELLA_CATALOGUE_URL
+    catalogue_url: str                   # ELLA_CATALOGUE_URL - GameZipper feed; empty (default) = GameZipper off, GamePix only
     embed_hosts: tuple[str, ...]         # ELLA_EMBED_HOSTS - the ONLY hosts a game may be loaded from
     catalogue_ttl: int                   # seconds (GameZipper asks for <= 6 h client-side caching)
     ads_policy: str                      # show_all (default) | verified_only | trust_provider
@@ -63,7 +63,7 @@ class Settings:
     rate_write_per_min: int
     utm_source: str                      # attribution host sent to GameZipper (publisher docs ask for it)
     gamepix_sid: str = ""                # ELLA_GAMEPIX_SID - GamePix partner site id ("" = GamePix off; default 9HOS3 outside dev)
-    gamepix_max: int = 1500              # ELLA_GAMEPIX_MAX - how many of the highest-quality GamePix games to list
+    gamepix_max: int = 2000              # ELLA_GAMEPIX_MAX - how many of the highest-quality GamePix games to list
     image_hosts: tuple[str, ...] = ("*.gamepix.com",)   # ELLA_IMAGE_HOSTS - extra hosts thumbnails may come from
     admin_ids: tuple[int, ...] = field(default_factory=tuple)   # ELLA_ADMIN_IDS - may read /api/admin/report
     dev: bool = False
@@ -109,9 +109,9 @@ def load() -> Settings:
         web_dir=Path(os.getenv("ELLA_WEB_DIR", str(ROOT / "web"))).resolve(),
         serve_frontend=_bool("ELLA_SERVE_FRONTEND", True),
         allowed_origins=_list("ELLA_ALLOWED_ORIGINS"),
-        catalogue_url=os.getenv("ELLA_CATALOGUE_URL", "https://gamezipper.com/api/games.json").strip(),
+        catalogue_url=os.getenv("ELLA_CATALOGUE_URL", "").strip(),
         embed_hosts=embed_hosts,
-        gamepix_sid=gp_sid, gamepix_max=max(0, min(_int("ELLA_GAMEPIX_MAX", 1500), 6000)),
+        gamepix_sid=gp_sid, gamepix_max=max(0, min(_int("ELLA_GAMEPIX_MAX", 2000), 6000)),
         image_hosts=tuple(h.lower() for h in _list("ELLA_IMAGE_HOSTS", "*.gamepix.com")),
         catalogue_ttl=_int("ELLA_CATALOGUE_TTL", 6 * 3600),
         ads_policy=os.getenv("ELLA_ADS_POLICY", "show_all").strip().lower(),
