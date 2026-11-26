@@ -46,11 +46,12 @@ async def welcome(first_name: str, group: bool = False, contacts: list[tuple[str
 
 def welcome_group_kb() -> InlineKeyboardMarkup:
     return kb([[B(text="🎮 Open Menu (every feature)", callback_data="nav:main")],
-               [B(text="🛡 Moderation Help (every admin cmd)", callback_data="nav:modhelp")]])
+               [B(text="🛡 Moderation Help (every admin cmd)", callback_data="nav:modhelp")],
+               [B(text="🎵 Music", callback_data="nav:music")]])
 
 
 def welcome_kb(contacts: list[tuple[str, str]] | None = None) -> InlineKeyboardMarkup:
-    rows = []
+    rows = [[B(text="🎵 Music", callback_data="nav:music")]]
     if brand.username():
         rows.append([B(text="➕ Add me to your group", url=brand.link("startgroup=true"))])
     if contacts:
