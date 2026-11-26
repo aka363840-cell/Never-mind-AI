@@ -28,10 +28,9 @@ MENU = (
     "kill", "revenge", "revive", "duel", "protect", "bounty", "shop", "inventory", "hunt", "dungeon", "pet",
     "clan", "top", "missions", "arcade", "spin", "slots", "marry", "family", "houses", "collect", "cd",
     "fish", "academy", "achievements", "voices", "v",
-    "mxplay", "mxstartplay", "mxqueue", "mxpause", "mxresume", "mxskip", "mxprevious", "mxshuffle", "mxloop", "mxstopplay", "mxseek",
 )
 # AI chat only works in groups, so /ask (and /settings) are listed in the group menu only
-GROUP_MENU_EXTRA = ("ask", "tap", "crash", "afk", "waifu", "whisper", "tagall", "q", "settings")
+GROUP_MENU_EXTRA = ("ask", "tap", "crash", "afk", "waifu", "whisper", "tagall", "q", "mxplay", "mxstartplay", "mxqueue", "mxpause", "mxresume", "mxskip", "mxprevious", "mxshuffle", "mxloop", "mxstopplay", "mxseek", "settings")
 
 # name -> description ("{name}" / "{emoji}" are replaced with the bot's name / emoji)
 DESC_LIST: list[tuple[str, str]] = [

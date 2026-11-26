@@ -51,7 +51,7 @@ def welcome_group_kb() -> InlineKeyboardMarkup:
 
 
 def welcome_kb(contacts: list[tuple[str, str]] | None = None) -> InlineKeyboardMarkup:
-    rows = [[B(text="🎵 Music", callback_data="nav:music")]]
+    rows = []
     if brand.username():
         rows.append([B(text="➕ Add me to your group", url=brand.link("startgroup=true"))])
     if contacts:
