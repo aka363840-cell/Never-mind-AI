@@ -47,6 +47,7 @@ async def _render(name: str, user: User):
     if name == "realm": return views.realm_help()
     if name == "casino": return views.casino_help()
     if name == "fun": return views.fun_help()
+    if name == "music": return views.music_help()
     if name == "tools": return views.group_tools()
     if name == "ai": return views.ai_info()
     if name == "about": return await views.about()
@@ -65,7 +66,7 @@ async def _render(name: str, user: User):
 PAGE_HELP = {
     "profile": ("Basics",), "balance": ("Economy", "Property"), "powers": ("Shop",), "shop": ("Shop",),
     "missions": ("Progress",), "combat": ("Combat",), "clan": ("Clans",), "pet": ("Adventure",), "realm": ("Adventure",),
-    "casino": ("Casino",), "fun": ("Social", "Games", "Music"), "family": ("Love",), "academy": ("Academy",), "ai": ("AI Chat",),
+    "casino": ("Casino",), "fun": ("Social", "Games"), "music": ("Music",), "family": ("Love",), "academy": ("Academy",), "ai": ("AI Chat",),
     "arcade": ("Games",),
 }
 
