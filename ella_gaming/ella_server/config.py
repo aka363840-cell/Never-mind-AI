@@ -63,7 +63,7 @@ class Settings:
     rate_write_per_min: int
     utm_source: str                      # attribution host sent to GameZipper (publisher docs ask for it)
     gamepix_sid: str = ""                # ELLA_GAMEPIX_SID - GamePix partner site id ("" = GamePix off; default 9HOS3 outside dev)
-    gamepix_max: int = 2000              # ELLA_GAMEPIX_MAX - how many of the highest-quality GamePix games to list
+    gamepix_max: int = 10000              # ELLA_GAMEPIX_MAX - how many of the highest-quality GamePix games to list
     top_count: int = 150                 # ELLA_TOP_COUNT - how many of the best games the Trending tab lists
     image_hosts: tuple[str, ...] = ("*.gamepix.com",)   # ELLA_IMAGE_HOSTS - extra hosts thumbnails may come from
     admin_ids: tuple[int, ...] = field(default_factory=tuple)   # ELLA_ADMIN_IDS - may read /api/admin/report
@@ -112,7 +112,7 @@ def load() -> Settings:
         allowed_origins=_list("ELLA_ALLOWED_ORIGINS"),
         catalogue_url=os.getenv("ELLA_CATALOGUE_URL", "").strip(),
         embed_hosts=embed_hosts,
-        gamepix_sid=gp_sid, gamepix_max=max(0, min(_int("ELLA_GAMEPIX_MAX", 2000), 6000)),
+        gamepix_sid=gp_sid, gamepix_max=max(0, min(_int("ELLA_GAMEPIX_MAX", 10000), 20000)),
         top_count=max(0, min(_int("ELLA_TOP_COUNT", 150), 1000)),
         image_hosts=tuple(h.lower() for h in _list("ELLA_IMAGE_HOSTS", "*.gamepix.com")),
         catalogue_ttl=_int("ELLA_CATALOGUE_TTL", 6 * 3600),

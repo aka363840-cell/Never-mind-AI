@@ -30,12 +30,13 @@ MENU = (
     "fish", "academy", "achievements", "voices", "v",
 )
 # AI chat only works in groups, so /ask (and /settings) are listed in the group menu only
-GROUP_MENU_EXTRA = ("ask", "tap", "crash", "afk", "waifu", "whisper", "tagall", "q", "mxplay", "mxstartplay", "mxqueue", "mxpause", "mxresume", "mxskip", "mxprevious", "mxshuffle", "mxloop", "mxstopplay", "mxseek", "settings")
+GROUP_MENU_EXTRA = ("ask", "tap", "crash", "afk", "waifu", "whisper", "tagall", "q", "mxplay", "mxstartplay", "mxplayforce", "mxqueue", "mxpause", "mxresume", "mxskip", "mxprevious", "mxshuffle", "mxloop", "mxstopplay", "mxseek", "settings")
 
 # name -> description ("{name}" / "{emoji}" are replaced with the bot's name / emoji)
 DESC_LIST: list[tuple[str, str]] = [
     ('mxplay', '🎵 Play a song or add it to the music queue'),
     ('mxstartplay', '▶️ Start playing a song or YouTube/streaming link'),
+    ('mxplayforce', '🔊 Force play a song immediately, overriding the current playback and queue'),
     ('mxqueue', '📜 View the current music queue'),
     ('mxpause', '⏸️ Pause the currently playing song'),
     ('mxresume', '▶️ Resume paused music'),
@@ -405,7 +406,7 @@ CATEGORIES: list[tuple[str, list[str]]] = [
     ("Academy 🎓", ["enroll", "academy", "schedule", "study", "attend", "hangout", "rest", "club", "parttime", "exam", "grades", "classrank",
                       "rival", "rivalduel", "crush", "crushoff", "campuscouple", "campusdate", "clubs", "buddy", "adventure", "academyremind", "reportcard", "halloffame", "academyhelp"]),
     ("🤖 AI Chat", ["ask", "voices", "v"]),
-    ("🎵 Music", ["mxplay", "mxstartplay", "mxqueue", "mxpause", "mxresume", "mxskip", "mxprevious", "mxshuffle", "mxloop", "mxstopplay", "mxseek"]),
+    ("🎵 Music", ["mxplay", "mxstartplay", "mxplayforce", "mxqueue", "mxpause", "mxresume", "mxskip", "mxprevious", "mxshuffle", "mxloop", "mxstopplay", "mxseek"]),
 ]
 OTHER = "📦 Other"
 

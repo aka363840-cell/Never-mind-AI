@@ -569,7 +569,7 @@ def fun_help() -> tuple[str, InlineKeyboardMarkup]:
 
 
 def music_help() -> tuple[str, InlineKeyboardMarkup]:
-    return (f"{brand.line()}\n\n🎵 <b>Music</b>\n\n/mxplay <i>song</i> — play a song or add it to the queue\n/mxstartplay <i>song or link</i> — start a song or YouTube/streaming link\n"
+    return (f"{brand.line()}\n\n🎵 <b>Music</b>\n\n/mxplay <i>song</i> — play a song or add it to the queue\n/mxstartplay <i>song or link</i> — start a song or YouTube/streaming link\n/mxplayforce <i>song</i> — play it right now, overriding the current song and queue\n"
             "/mxqueue — the current queue\n/mxpause · /mxresume — pause or resume\n/mxskip · /mxprevious — next or previous song\n"
             "/mxshuffle — shuffle the queue · /mxloop — repeat on/off\n/mxseek <i>time</i> — jump to a timestamp\n/mxstopplay — stop and clear the queue"), kb([back()])
 
