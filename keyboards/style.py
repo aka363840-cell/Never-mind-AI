@@ -151,11 +151,11 @@ class ButtonStyleMiddleware(BaseRequestMiddleware):
             if is_kb:
                 new, used = decorate(mk, icons=time.monotonic() >= _refused_until)
                 upd["reply_markup"] = new
-            if not upd:
-                return await make_request(bot, method)
-            m2 = method.model_copy(update=upd)
+            m2 = method.model_copy(update=upd) if upd else None
         except Exception:                                   # never let styling break a message
             log.exception("styling failed; sending the message as it is")
+            m2 = None
+        if m2 is None:                                      # outside the try: Telegram errors are not styling failures
             return await make_request(bot, method)
         text_used = any(k in upd for k in ("text", "caption", "entities", "caption_entities"))
         try:
