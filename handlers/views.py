@@ -179,6 +179,7 @@ def _rule_duel() -> str:
             f"• The invite expires after {dur(R.duel_invite_ttl_s)}, and each round must be played within {dur(R.duel_play_ttl_s)}.\n"
             f"• Only the first {R.duel_pair_daily_credit} duels per pair per day count for XP and win/loss stats.\n"
             f"• Each player secretly picks a stance: {stance_help()}.\n"
+            f"• Level, gear and pet count, and so does luck. Powers and potions don't work in duels.\n"
             f"• Duels never kill anyone.")
 
 
@@ -335,7 +336,8 @@ async def powers(uid: int, text_only: bool = False) -> tuple[str, InlineKeyboard
     owned = await shop.owned_powers(uid)
     async with db.tx() as s:
         eq = (await s.get(User, uid)).equipped_power
-    lines, rows = [f"{brand.line()}\n\n⚡ <b>Powers</b>  <i>(1 equipped at a time)</i>\n"], []
+    lines, rows = [f"{brand.line()}\n\n⚡ <b>Powers</b>  <i>(1 equipped at a time)</i>\n"
+             "<i>Phantom, Reaper, Mirror and Phoenix work in the dungeon only. In /kill and /duel they don't count.</i>\n"], []
     for k, p in POWERS.items():
         o = owned.get(k)
         status = f"Lv {o.level}/{p.max_level}{' ✅ equipped' if eq == k else ''}" if o else f"{num(p.price)} 💎"
