@@ -143,6 +143,7 @@ def _rule_kill() -> str:
             f"• They are <b>dead</b>: they must pay {R.revive_cost} 💎 with /revive before they can fight, rob or kill again.\n• +{R.xp_win} XP.\n\n"
             f"💔 <b>If you lose</b>\n• You pay <b>{_pct(R.kill_loss_pct)}</b> of your wallet (at most {R.kill_loss_max} 💎) to the winner. +{R.xp_loss} XP.\n\n"
             f"🚫 <b>Limits</b>\n• You can't attack a dead or protected player.\n"
+            f"• {dur(R.kill_cooldown_s)} wait between your kills.\n"
             f"• Someone who just revived is immune for {dur(R.kill_victim_immunity_s)}.\n"
             f"• The same two players can fight at most <b>{R.kill_pair_daily_limit}×</b> per day.\n"
             f"• Attacking drops your own protection.\n\n"

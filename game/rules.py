@@ -166,7 +166,7 @@ class Rules:
     defence_per_level: int = 1
     fight_rounds: int = 6
     crit_chance: float = 0.10
-    kill_cooldown_s: int = 0             # no kill cooldown
+    kill_cooldown_s: int = 60            # 1 minute between kills (stops one player chain-killing a whole group)
     kill_victim_immunity_s: int = 900
     kill_pair_daily_limit: int = 3
     kill_reward_pct: float = 0.20        # killer takes 20% of the victim's FREE diamonds (wallet only, never the bank)

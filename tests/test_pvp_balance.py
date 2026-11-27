@@ -39,3 +39,7 @@ def test_a_big_level_gap_still_wins_almost_always():
 
 def test_kill_reward_is_capped_like_rob():
     assert R.kill_reward_max == R.rob_max_steal and R.kill_loss_pct >= 0.10
+
+
+def test_kills_have_a_short_cooldown():
+    assert 0 < R.kill_cooldown_s <= 120
