@@ -77,6 +77,60 @@ def _hit(src: Fighter, dst: Fighter, rng: random.Random, log: list[str]) -> int:
     return dmg
 
 
+# ---------------------------------------------------------------------------------------- PvP (kill / revenge / duel)
+PVP_DAMP = 0.25          # how much of a stat gap counts (1 = all of it): a level or an item helps, it doesn't decide alone
+PVP_K = 25               # defence is a percentage cut: damage * K / (K + defence)
+PVP_SPREAD = (0.5, 1.5)  # every hit lands between 50% and 150% of its base damage
+PVP_CRIT = 0.15
+
+
+def _damped(a: Fighter, d: Fighter) -> tuple[Fighter, Fighter]:
+    """Compress the stat gap between the two fighters (hp / attack / defence) around their geometric mean."""
+    def mix(x: float, y: float) -> tuple[float, float]:
+        g = (max(x, 1e-6) * max(y, 1e-6)) ** 0.5
+        return (x / g) ** PVP_DAMP * g, (y / g) ** PVP_DAMP * g
+    (ha, hd), (aa, ad), (da, dd) = mix(a.hp, d.hp), mix(a.atk, d.atk), mix(a.dfn, d.dfn)
+    return (Fighter(a.uid, a.name, max(1, round(ha)), aa, da), Fighter(d.uid, d.name, max(1, round(hd)), ad, dd))
+
+
+def resolve_pvp(a: Fighter, d: Fighter, rng: random.Random | None = None, a_first: bool = True,
+                a_mod: tuple[float, float] = (1.0, 1.0), d_mod: tuple[float, float] = (1.0, 1.0)) -> FightResult:
+    """Player-vs-player fight: no powers, no potion; gear and level help but cannot decide the fight on their own, and
+    luck (50-150% hits, 15% crits) matters. a_mod / d_mod = (attack x, defence x) stance multipliers, applied after the
+    stat gap is compressed so a stance keeps its full effect."""
+    rng = rng or random.Random()
+    fa, fd = _damped(a, d)
+    fa.atk *= a_mod[0]; fa.dfn *= a_mod[1]; fd.atk *= d_mod[0]; fd.dfn *= d_mod[1]
+    log: list[str] = []
+    dealt = {a.uid: 0, d.uid: 0}
+    order = (fa, fd) if a_first else (fd, fa)
+    for _ in range(R.fight_rounds):
+        for src in order:
+            dst = fd if src is fa else fa
+            if src.hp <= 0 or dst.hp <= 0:
+                continue
+            dmg = src.atk * rng.uniform(*PVP_SPREAD)
+            crit = rng.random() < PVP_CRIT
+            if crit:
+                dmg *= 1.5
+            dmg = max(1, round(dmg * PVP_K / (PVP_K + dst.dfn)))
+            dst.hp = max(0, dst.hp - dmg)
+            dealt[src.uid] += dmg
+            log.append(f"{'💥' if crit else '🗡'} {src.name} hits {dst.name} for {dmg}" + (" (CRIT)" if crit else ""))
+        if fa.hp <= 0 or fd.hp <= 0:
+            break
+    if fa.hp <= 0 and fd.hp <= 0:
+        winner = None
+    elif fa.hp <= 0:
+        winner = d.uid
+    elif fd.hp <= 0:
+        winner = a.uid
+    else:
+        ra, rd = fa.hp / fa.start_hp, fd.hp / fd.start_hp
+        winner = a.uid if ra > rd else d.uid if rd > ra else None
+    return FightResult(winner, {a.uid: fa.hp, d.uid: fd.hp}, dealt, log)
+
+
 def resolve(a: Fighter, d: Fighter, rng: random.Random | None = None, a_first: bool = True) -> FightResult:
     rng = rng or random.Random()
     log: list[str] = []

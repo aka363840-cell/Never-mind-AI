@@ -138,8 +138,8 @@ def _pct(x: float) -> str:
 
 def _rule_kill() -> str:
     return (f"⚔️ <b>Kill rules</b>\n{DIV}\n"
-            f"<code>/kill</code> (reply or @user) starts a {R.fight_rounds}-round fight. Level, equipped gear, your active power and a Health Potion all count.\n\n"
-            f"🏆 <b>If you win</b>\n• You take <b>{_pct(R.kill_reward_pct)}</b> of their wallet. Banked 💎 are never touched.\n"
+            f"<code>/kill</code> (reply or @user) starts a {R.fight_rounds}-round fight. Level, equipped gear and your pet count; so does luck. Powers and potions don't work in player fights.\n\n"
+            f"🏆 <b>If you win</b>\n• You take <b>{_pct(R.kill_reward_pct)}</b> of their wallet (at most {R.kill_reward_max:,} 💎). Banked 💎 are never touched.\n"
             f"• They are <b>dead</b>: they must pay {R.revive_cost} 💎 with /revive before they can fight, rob or kill again.\n• +{R.xp_win} XP.\n\n"
             f"💔 <b>If you lose</b>\n• You pay <b>{_pct(R.kill_loss_pct)}</b> of your wallet (at most {R.kill_loss_max} 💎) to the winner. +{R.xp_loss} XP.\n\n"
             f"🚫 <b>Limits</b>\n• You can't attack a dead or protected player.\n"
@@ -212,8 +212,8 @@ def _rule_gear() -> str:
     return (f"🛒 <b>Gear, powers and items</b>\n{DIV}\n"
             f"• Weapons, armour and shields only help in fights while <b>equipped</b> (one of each). /equip KEY.\n"
             f"• Each upgrade level adds +{_pct(R.upgrade_stat_bonus)} of an item's stats. The upgrade cost is shown on its button.\n"
-            f"• Powers: buy, equip one, then /activate before a fight. Upgrades add +{_pct(R.power_level_bonus)} strength per level.\n"
-            f"• Health Potion: +{R.potion_hp} HP in your fights for {dur(R.potion_duration_s)}.\n"
+            f"• Powers: buy, equip one, then /activate. Phantom, Reaper, Mirror and Phoenix work in the dungeon only. Upgrades add +{_pct(R.power_level_bonus)} strength per level.\n"
+            f"• Health Potion: +{R.potion_hp} HP in dungeon fights for {dur(R.potion_duration_s)}.\n"
             f"• Selling gives back {_pct(R.sell_ratio)} of the shop price.\n"
             f"• Collectibles are trophies with no fight bonus.")
 
@@ -287,7 +287,7 @@ async def profile(uid: int) -> tuple[str, InlineKeyboardMarkup]:
     if prot_left:
         status.append(f"🛡 Protected for <b>{dur(prot_left)}</b>")
     if potion_left:
-        status.append(f"🧪 Health Potion active: +{R.potion_hp} HP for <b>{dur(potion_left)}</b>")
+        status.append(f"🧪 Health Potion active (dungeon): +{R.potion_hp} HP for <b>{dur(potion_left)}</b>")
     if clan_row:
         status.append(f"🏰 Clan: <b>{esc(clan_row[1].name)}</b>")
     if owned_houses:
@@ -366,7 +366,7 @@ CATEGORY_ROLE = {
     "shields": "🛡 <b>What they do:</b> add <b>defence</b> in every fight, only while equipped. "
                "Buy → <code>/equip KEY</code>. One shield at a time.",
     "consumables": "🧪 <b>What they do:</b> single-use items. Buy → <code>/use KEY</code> "
-                   "(Health Potion: +HP in your fights for a while · XP Scroll: instant XP).",
+                   "(Health Potion: +HP in dungeon fights for a while · XP Scroll: instant XP).",
     "cosmetics": "🎭 <b>What they do:</b> a profile <b>title</b> shown next to your name. Buy → <code>/equip KEY</code>. "
                  "No fight bonus.",
     "collectibles": "💠 <b>What they do:</b> trophies with <b>no fight bonus</b>. They show in /inventory and can be "

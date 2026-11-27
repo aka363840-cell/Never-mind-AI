@@ -181,7 +181,7 @@ async def use_item(uid: int, key: str) -> str:
         await s.execute(delete(InventoryItem).where(InventoryItem.user_id == uid, InventoryItem.item_key == o.key, InventoryItem.qty == 0))
         if o.key == "health_potion":
             await cooldowns.set_(s, uid, "buff_potion", R.potion_duration_s)
-            return f"🧪 +{R.potion_hp} HP in your fights for {R.potion_duration_s // 60} minutes."
+            return f"🧪 +{R.potion_hp} HP in dungeon fights for {R.potion_duration_s // 60} minutes."
         if o.key == "xp_scroll":
             lvl = await progress.add_xp(s, uid, 100)
             return f"📜 +100 XP (level {lvl})."

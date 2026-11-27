@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import CombatRecord, Duel, GroupStat, User, aware, utcnow
 from database.session import db, insert_ignore
-from game.engine import STRATEGIES, FightResult, resolve
+from game.engine import STRATEGIES, FightResult, resolve_pvp
 from game.rules import R
 from services import combat, cooldowns, economy, progress, users
 from services.errors import GameError, OnCooldown
@@ -154,11 +154,10 @@ async def choose(duel_id: int, user_id: int, strat: str, rng: random.Random | No
 
 async def _resolve(s: AsyncSession, d: Duel, rng: random.Random) -> DuelResult:
     cu, tu = await s.get(User, d.challenger_id), await s.get(User, d.target_id)
-    fc, ft = await combat.load_fighter(s, cu), await combat.load_fighter(s, tu)
-    for f, ch in ((fc, d.challenger_choice), (ft, d.target_choice)):
-        _, am, dm = STRATEGIES[ch]
-        f.atk *= am; f.dfn *= dm
-    res = resolve(fc, ft, rng, a_first=rng.random() < 0.5)
+    fc, ft = await combat.load_fighter(s, cu, pvp=True), await combat.load_fighter(s, tu, pvp=True)
+    _, cam, cdm = STRATEGIES[d.challenger_choice]
+    _, tam, tdm = STRATEGIES[d.target_choice]
+    res = resolve_pvp(fc, ft, rng, a_first=rng.random() < 0.5, a_mod=(cam, cdm), d_mod=(tam, tdm))
     await combat.persist_consumed(s, fc); await combat.persist_consumed(s, ft)
     winner = res.winner
     pot = d.wager * 2 if d.wager else 0

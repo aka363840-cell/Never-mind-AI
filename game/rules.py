@@ -47,22 +47,22 @@ POWERS: dict[str, PowerDef] = {
     p.key: p
     for p in [
         PowerDef("PHANTOM", "Phantom", "👻", 3000, 150, 2400, 900,
-                 "Halve ONE incoming hit while active.",
+                 "Dungeon only: halve ONE incoming hit while active.",
                  "Single charge. Critical hits cannot be avoided."),
         PowerDef("REAPER", "Reaper", "💀", 4000, 200, 2400, 600,
-                 "+20% damage dealt while active (+10% per upgrade).",
+                 "Dungeon only: +20% damage dealt while active (+10% per upgrade).",
                  "Your own defence is reduced by 10% while active."),
         PowerDef("GUARDIAN", "Guardian", "🛡", 3500, 300, 4800, 600,
                  "Grant another player temporary protection (reply to them with /activate).",
                  "Cannot target yourself or an already-protected player. Short protection."),
         PowerDef("MIRROR", "Mirror", "🪞", 3500, 200, 2400, 600,
-                 "Reflect 10% of incoming damage (+10% per upgrade).",
+                 "Dungeon only: reflect 10% of incoming damage (+10% per upgrade).",
                  "Reflected damage is capped at 6 per hit and cannot kill."),
         PowerDef("ORACLE", "Oracle", "🔮", 2000, 100, 1200, 0,
                  "Scan another player (reply with /activate): level, combat stats, power, protection.",
                  "Never reveals wallet or bank balances."),
         PowerDef("PHOENIX", "Phoenix", "🔥", 5000, 400, 28800, 3600,
-                 "Survive ONE lethal hit with 1 HP while active.",
+                 "Dungeon only: survive ONE lethal hit with 1 HP while active.",
                  "Single charge, 12h cooldown."),
         PowerDef("PARASITE", "Parasite", "🦠", 4500, 250, 4800, 600,
                  "Steal an extra 15% of the loser's wallet after a won fight (+3% per upgrade).",
@@ -83,7 +83,7 @@ ITEMS: dict[str, ItemDef] = {
         ItemDef("wooden_shield", "shields", "Wooden Shield", "🪵", 400, "Blocks a few blows.", defence=3),
         ItemDef("tower_shield", "shields", "Tower Shield", "🏰", 6000, "A moving wall.", defence=8),
         ItemDef("health_potion", "consumables", "Health Potion", "🧪", 300,
-                "/use: +40 HP in your fights for 30 minutes.", stackable=True, max_level=1),
+                "/use: +40 HP in dungeon fights for 30 minutes.", stackable=True, max_level=1),
         ItemDef("xp_scroll", "consumables", "XP Scroll", "📜", 800,
                 "/use: instantly gain 100 XP.", stackable=True, max_level=1),
         ItemDef("title_hunter", "cosmetics", "Hunter", "🏹", 2000, "Profile title.", max_level=1),
@@ -169,9 +169,10 @@ class Rules:
     kill_cooldown_s: int = 0             # no kill cooldown
     kill_victim_immunity_s: int = 900
     kill_pair_daily_limit: int = 3
-    kill_reward_pct: float = 0.30        # killer takes 30% of the victim's FREE diamonds (wallet only, never the bank)
-    kill_loss_pct: float = 0.04          # what the attacker pays if they lose
-    kill_loss_max: int = 400
+    kill_reward_pct: float = 0.20        # killer takes 20% of the victim's FREE diamonds (wallet only, never the bank)
+    kill_reward_max: int = 2000          # ... but never more than this (same cap as /rob)
+    kill_loss_pct: float = 0.10          # what the attacker pays if they lose
+    kill_loss_max: int = 600
     revive_cost: int = 150               # a dead player must pay this to /revive before killing again
     xp_win: int = 25
     xp_loss: int = 8

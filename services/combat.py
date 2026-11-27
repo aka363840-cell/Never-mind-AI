@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database.models import (Pet, CombatRecord, GroupStat, InventoryItem, Protection, ShopItem, User, UserPower,
                              UserStat, aware, utcnow)
 from database.session import db, insert_ignore
-from game.engine import Fighter, FightResult, resolve
+from game.engine import Fighter, FightResult, resolve, resolve_pvp
 from game.rules import R, pet_stats
 from services import cooldowns, economy, bounty, progress, users
 from services.errors import GameError, OnCooldown
@@ -115,7 +115,7 @@ async def protect(uid: int, hours: int) -> tuple[int, int]:
 
 
 # ------------------------------------------------------------ fighter loading
-async def load_fighter(s: AsyncSession, u: User, *, attack_bonus: float = 0.0, now=None) -> Fighter:
+async def load_fighter(s: AsyncSession, u: User, *, attack_bonus: float = 0.0, now=None, pvp: bool = False) -> Fighter:
     now = now or utcnow()
     hp = R.base_hp + u.level * R.hp_per_level
     atk = R.base_attack + u.level * R.attack_per_level
@@ -129,10 +129,10 @@ async def load_fighter(s: AsyncSession, u: User, *, attack_bonus: float = 0.0, n
     if pet:
         pa, pd, ph = pet_stats(pet.level, pet.rarity)
         atk += pa; dfn += pd; hp += ph
-    if await cooldowns.remaining(s, u.id, "buff_potion"):
-        hp += R.potion_hp
+    if not pvp and await cooldowns.remaining(s, u.id, "buff_potion"):
+        hp += R.potion_hp                   # potions and powers are for the dungeon; PvP is decided by level, gear and luck
     power, pm, charges = None, 1.0, 0
-    if u.equipped_power:
+    if u.equipped_power and (not pvp or u.equipped_power == "PARASITE"):   # PvP: only Parasite (a reward, not a fight edge)
         up = await s.get(UserPower, (u.id, u.equipped_power))
         if up and up.active_until and aware(up.active_until) > now and u.equipped_power in (
                 "PHANTOM", "REAPER", "MIRROR", "PHOENIX", "PARASITE"):
@@ -174,8 +174,8 @@ async def _settle(s: AsyncSession, kind: str, a: User, d: User, fa: Fighter, fd:
     if winner_id is not None:
         w, l = (a, d) if winner_id == a.id else (d, a)
         if winner_id == a.id:
-            # 30% of the victim's FREE diamonds (wallet only); at least 1 so a tiny wallet still pays
-            wanted = max(1, int((await economy.wallet_of(s, l.id)).balance * R.kill_reward_pct))
+            # a share of the victim's FREE diamonds (wallet only, capped); at least 1 so a tiny wallet still pays
+            wanted = max(1, min(int((await economy.wallet_of(s, l.id)).balance * R.kill_reward_pct), R.kill_reward_max))
         else:
             wallet = (await economy.wallet_of(s, l.id)).balance
             wanted = min(int(wallet * R.kill_loss_pct), R.kill_loss_max)
@@ -261,7 +261,7 @@ async def attack(attacker_id: int, target_id: int, chat_id: int | None = None, *
                 raise GameError("❌ Revenge already taken.")
         if await is_protected(s, attacker_id):   # attacking drops your own shield
             await s.execute(delete(Protection).where(Protection.user_id == attacker_id))
-        fa = await load_fighter(s, a, attack_bonus=R.revenge_attack_bonus if kind == "revenge" else 0)
-        fd = await load_fighter(s, d)
-        res = resolve(fa, fd, rng, a_first=True)
+        fa = await load_fighter(s, a, attack_bonus=R.revenge_attack_bonus if kind == "revenge" else 0, pvp=True)
+        fd = await load_fighter(s, d, pvp=True)
+        res = resolve_pvp(fa, fd, rng, a_first=True)
         return await _settle(s, kind, a, d, fa, fd, res, chat_id)
