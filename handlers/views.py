@@ -569,7 +569,7 @@ def casino_help() -> tuple[str, InlineKeyboardMarkup]:
 def fun_help() -> tuple[str, InlineKeyboardMarkup]:
     return (f"{brand.line()}\n\n🎉 <b>Fun &amp; Social</b>\n\n/hug /slap /pat /poke /highfive /cuddle <i>(reply or @user)</i>\n"
             "/kiss /dance /wave /yeet … — see /actions for all of them\n/fish · /mine · /trivia — earn 💎 with mini-games\n/marry · /couple · /divorce 💍\n/date · /gift · /baby · /adopt · /family 👨‍👩‍👧‍👦\n/houses · /collect 🏠 · /familybonus\n"
-            "/roast · /compliment · /rate · /choose · /iq · /lucky\n/ship — love calculator 💘\n/roll <i>2d6</i> — dice 🎲\n/8ball <i>question</i> 🎱\n/truth · /dare · /joke\n"
+            "/birthday <i>DD-MM</i> — I wish you + gift 🎂\n/roast · /compliment · /rate · /choose · /iq · /lucky\n/ship — love calculator 💘\n/roll <i>2d6</i> — dice 🎲\n/8ball <i>question</i> 🎱\n/truth · /dare · /joke\n"
             "\n👥 Whisper, tag-all, quote, afk, waifu… → <b>Group Tools</b> button · 🕹 all games → <b>Games</b> button\n\n"
             f"/ask <i>anything</i> — talk to {brand.name()} {brand.EMOJI} (or just say my name in a group!)"), kb([back()])
 

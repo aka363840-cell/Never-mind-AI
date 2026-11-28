@@ -17,7 +17,7 @@ from config import get_settings
 from database.session import db
 from middlewares.core import CoreMiddleware, ErrorMiddleware
 from services import announce, backup, bounty, duel, events, shop
-from services import seasons as _seasons
+from services import seasons as _seasons, birthdays as _birthdays
 from services.kv import init_kv
 from utils import brand
 from utils.commands import refresh_commands
@@ -69,7 +69,7 @@ async def housekeeping_loop() -> None:
 
 
 def build_dispatcher(ai=None) -> Dispatcher:
-    from handlers import admin, ai_chat, casino, clan, combat, economy, events as events_h, fun, pets as pets_h, rank, shop as shop_h, market as market_h, season as season_h, start, welcome, extras as extras_h, life as life_h, realm as realm_h, family as family_h, arcade as arcade_h, romance as romance_h, waifu as waifu_h, afk as afk_h, consent as consent_h, whisper as whisper_h, tagall as tagall_h, members as members_h, quote as quote_h, wordseek as wordseek_h, wordgames as wordgames_h, wordchain as wordchain_h, charades as charades_h, jumble as jumble_h, dick as dick_h, ella_app as ella_app_h, premium_games as premium_h, academy_routers
+    from handlers import admin, ai_chat, casino, clan, combat, economy, events as events_h, fun, pets as pets_h, rank, shop as shop_h, market as market_h, season as season_h, birthday as birthday_h, start, welcome, extras as extras_h, life as life_h, realm as realm_h, family as family_h, arcade as arcade_h, romance as romance_h, waifu as waifu_h, afk as afk_h, consent as consent_h, whisper as whisper_h, tagall as tagall_h, members as members_h, quote as quote_h, wordseek as wordseek_h, wordgames as wordgames_h, wordchain as wordchain_h, charades as charades_h, jumble as jumble_h, dick as dick_h, ella_app as ella_app_h, premium_games as premium_h, academy_routers
     dp = Dispatcher()
     dp.workflow_data["ai"] = ai
     from services.academy_seen import GroupSeenMiddleware      # Academy Part 6: notes group activity (one write per group per 6 h)
@@ -103,7 +103,7 @@ def build_dispatcher(ai=None) -> Dispatcher:
     except Exception:
         log.exception("moderation module failed to load - continuing without it")
     # order matters: admin & game routers first, free-form AI chat last
-    routers = [admin.router, start.router, economy.router, casino.router, clan.router, pets_h.router, events_h.router, realm_h.router, consent_h.router, fun.router, combat.router, shop_h.router, market_h.router, season_h.router, rank.router, welcome.router, extras_h.router, life_h.router, family_h.router, arcade_h.router, romance_h.router, waifu_h.router, afk_h.router, whisper_h.router, tagall_h.router, members_h.router, quote_h.router, jumble_h.router, wordgames_h.router, wordchain_h.router, charades_h.router, dick_h.router, ella_app_h.router, premium_h.router, wordseek_h.router, *academy_routers.routers(), ai_chat.router]
+    routers = [admin.router, start.router, economy.router, casino.router, clan.router, pets_h.router, events_h.router, realm_h.router, consent_h.router, fun.router, combat.router, shop_h.router, market_h.router, season_h.router, birthday_h.router, rank.router, welcome.router, extras_h.router, life_h.router, family_h.router, arcade_h.router, romance_h.router, waifu_h.router, afk_h.router, whisper_h.router, tagall_h.router, members_h.router, quote_h.router, jumble_h.router, wordgames_h.router, wordchain_h.router, charades_h.router, dick_h.router, ella_app_h.router, premium_h.router, wordseek_h.router, *academy_routers.routers(), ai_chat.router]
     if mod_head is not None:
         routers.insert(0, mod_head)                  # group moderation commands win over same-named game commands (groups only)
         routers.insert(routers.index(ai_chat.router), mod_tail)     # AI-isolation guard sits right before the AI chat
@@ -252,7 +252,7 @@ async def main() -> None:
     tasks = [asyncio.create_task(brand_loop(bot)), asyncio.create_task(maintenance_loop(bot)), asyncio.create_task(events.events_loop(bot)),
              asyncio.create_task(announce.levelup_loop(bot)),
              asyncio.create_task(realm_loop(bot)), asyncio.create_task(housekeeping_loop()),
-             asyncio.create_task(romance_loop(bot)), asyncio.create_task(academy_loop(bot)), asyncio.create_task(_seasons.season_loop(bot))]
+             asyncio.create_task(romance_loop(bot)), asyncio.create_task(academy_loop(bot)), asyncio.create_task(_seasons.season_loop(bot)), asyncio.create_task(_birthdays.birthday_loop(bot))]
     try:
         from services import members as _members
         tasks.append(asyncio.create_task(_members.scan_loop(bot)))          # finds everyone in every group, no commands needed
