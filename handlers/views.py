@@ -398,7 +398,7 @@ def shop_home(text_only: bool = False) -> tuple[str, InlineKeyboardMarkup | None
     head = f"{brand.line()}\n\n🛒 <b>Shop</b>\nAll prices in 💎. Choose a category — each page explains what its items do.\n<i>Gear (weapons, armour, shields) only works once you /equip it.</i>"
     if text_only:
         return head + "\n\n" + "\n".join(f"{names[c]} — <code>/shop {c}</code>" for c in CATEGORIES) + "\n\nBuy: <code>/buy KEY</code>", None
-    return head, kb(rows + [back()])
+    return head, kb(rows + [[B(text="🏪 Player Market", callback_data="mkt:list")], back()])
 
 
 async def shop_category(cat: str, text_only: bool = False) -> tuple[str, InlineKeyboardMarkup | None]:
