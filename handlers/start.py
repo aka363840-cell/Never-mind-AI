@@ -4,7 +4,7 @@ from pathlib import Path
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandObject
-from aiogram.types import CallbackQuery, FSInputFile, InlineKeyboardButton as B, InlineKeyboardMarkup, Message
+from aiogram.types import BufferedInputFile, CallbackQuery, FSInputFile, InlineKeyboardButton as B, InlineKeyboardMarkup, Message
 
 from database.models import AppState, GroupSetting, User
 from database.session import db
@@ -257,6 +257,49 @@ async def nav(cb: CallbackQuery, db_user: User):
 async def profile_cmd(m: Message, db_user: User):
     text, markup = await views.profile(db_user.id)
     await m.reply(text, reply_markup=markup if m.chat.type == "private" else None)
+
+
+async def _send_card(m: Message, uid: int):
+    import asyncio
+    from game.rules import ACHIEVEMENTS, PET_SPECIES
+    from services import clans, economy, progress
+    from database.models import Pet
+    from utils import profilecard
+    async with db.tx() as s:
+        u = await s.get(User, uid)
+        w = await economy.wallet_of(s, uid)
+        pet = await s.get(Pet, uid)
+        cl = await clans._member(s, uid)
+    n_ach = len(await progress.achievements_of(uid))
+    try:
+        streak = await economy.streak_of(uid)
+    except Exception:
+        streak = 0
+    png = await asyncio.to_thread(
+        profilecard.render, name=u.first_name or "Player", level=u.level, xp=u.xp, xp_need=u.level * R.xp_per_level,
+        diamonds=w.balance + w.bank, kills=u.kills, deaths=u.deaths, wins=u.wins, title=u.title or "",
+        pet=f"{PET_SPECIES[pet.species][0]} {pet.name} Lv{pet.level}" if pet else "",
+        clan=cl[1].name if cl else "", badges=n_ach, badges_total=len(ACHIEVEMENTS), streak=streak)
+    await m.answer_photo(BufferedInputFile(png, "profile.png"), caption="🪪 Your profile card — share it anywhere!")
+
+
+@router.message(Command("card", "pcard", "profilecard"))
+async def card_cmd(m: Message, db_user: User):
+    try:
+        await _send_card(m, db_user.id)
+    except Exception:
+        log.exception("profile card failed")
+        await m.reply("⚠️ Couldn't make the card right now, try again in a bit.")
+
+
+@router.callback_query(F.data == "card:me")
+async def card_cb(c: CallbackQuery, db_user: User):
+    await c.answer()
+    try:
+        await _send_card(c.message, db_user.id)
+    except Exception:
+        log.exception("profile card failed")
+        await c.message.answer("⚠️ Couldn't make the card right now, try again in a bit.")
 
 
 # ------------------------------------------------------------ group settings (Telegram group admins)

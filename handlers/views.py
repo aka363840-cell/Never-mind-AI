@@ -306,6 +306,7 @@ async def profile(uid: int) -> tuple[str, InlineKeyboardMarkup]:
             f"{gear}\n{extra}\n⚡ Equipped Power: {p.emoji + ' ' + p.name if p else '—'}\n{pet_line}\n🏅 Achievements: {n_ach}/{len(ACHIEVEMENTS)}  (/achievements)")
     return text, kb([[B(text="🎒 Inventory", callback_data="inv:0"), B(text="⚡ Powers", callback_data="nav:powers")],
                      [B(text="🏆 Leaderboard", callback_data="lb:rich:0"), B(text="🔄 Profile", callback_data="nav:profile")],
+                     [B(text="🪪 Profile Card (image)", callback_data="card:me")],
                      back()])
 
 

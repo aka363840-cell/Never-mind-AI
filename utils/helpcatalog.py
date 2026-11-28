@@ -101,6 +101,7 @@ DESC_LIST: list[tuple[str, str]] = [
     ('rules', '📜 Rules: kill, rob, protection, money… with the exact numbers'),
     ('about', 'ℹ️ About this bot'),
     ('profile', '👤 Your profile & stats'),
+    ('card', '🪪 Your profile card (image, shareable)'),
     ('bal', '💎 Wallet & bank'),
     ('daily', '🎁 Claim daily reward'),
     ('weekly', '📅 Claim weekly reward'),
@@ -291,6 +292,7 @@ ALIASES: dict[str, tuple[str, ...]] = {
     'mine': ('mining',),
     'pet': ('pets',),
     'profile': ('me',),
+    'card': ('pcard', 'profilecard'),
     'rep': ('respect',),
     'new': ('new4', 'new5', 'new6', 'wordseek', 'wnew'),
     'jumble': ('jum',),
@@ -385,7 +387,7 @@ def pages(items: list[tuple[str, str, tuple[str, ...]]], limit: int = 3300) -> l
 # (fun.ACTIONS / family.ROLES) and are shown as one compact line.  Any public command that is not listed
 # here still shows up under "Other", so a new command can never be missing from /help.
 CATEGORIES: list[tuple[str, list[str]]] = [
-    ("🚀 Basics", ["start", "help", "rules", "about", "profile", "cd", "settings", "clear"]),
+    ("🚀 Basics", ["start", "help", "rules", "about", "profile", "card", "cd", "settings", "clear"]),
     ("💰 Economy", ["bal", "daily", "weekly", "work", "crime", "rob", "pay", "deposit", "withdraw", "interest"]),
     ("🏠 Property & Rent", ["houses", "collect"]),
     ("⚔️ Combat & PvP", ["kill", "revenge", "revive", "duel", "protect", "bounty"]),
