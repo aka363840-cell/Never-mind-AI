@@ -477,7 +477,7 @@ async def missions(uid: int) -> tuple[str, InlineKeyboardMarkup]:
             if done and not m.claimed:
                 rows.append([B(text=f"Claim +{m.reward}💎 · {m.title[:28]}", callback_data=f"ms:{m.id}")])
     lines.append(f"\n🏅 Achievements: <b>{len(ach & set(ACHIEVEMENTS))}/{len(ACHIEVEMENTS)}</b> — see /achievements")
-    return "\n".join(lines), kb(rows + [back()])
+    return "\n".join(lines), kb(rows + [[B(text="🏆 Top Earners (weekly prizes)", callback_data="season:week")], back()])
 
 
 _MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}
