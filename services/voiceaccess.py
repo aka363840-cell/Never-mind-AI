@@ -108,3 +108,29 @@ def in_wait_secs(uid: int, now: float | None = None) -> int:
 def in_count(uid: int, now: float | None = None) -> None:
     """Call right before a voice note is transcribed (the request costs quota even if it fails)."""
     _in_used.setdefault(uid, deque()).append(time.time() if now is None else now)
+
+
+# ---- /vtext (turn somebody's voice message into text; each one costs a transcription request): its own hourly limit per person
+_vt_used: dict[int, deque] = {}
+
+
+def vtext_limit() -> int:
+    try:
+        return max(1, int(os.getenv("AI_VTEXT_PER_HOUR", "10")))
+    except ValueError:
+        return 10
+
+
+def vtext_wait_secs(uid: int, now: float | None = None) -> int:
+    """0 = allowed. The owner has no limit."""
+    if _is_owner(uid):
+        return 0
+    now = time.time() if now is None else now
+    q = _vt_used.setdefault(uid, deque())
+    while q and now - q[0] >= WINDOW:
+        q.popleft()
+    return 0 if len(q) < vtext_limit() else int(WINDOW - (now - q[0])) + 1
+
+
+def vtext_count(uid: int, now: float | None = None) -> None:
+    _vt_used.setdefault(uid, deque()).append(time.time() if now is None else now)

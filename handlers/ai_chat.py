@@ -528,6 +528,49 @@ async def v_cmd(m: Message, command: CommandObject, bot: Bot, ai: ChatService | 
     await _talk(m, bot, ai, text, voice=True)
 
 
+@router.message(Command("vtext"))
+async def vtext_cmd(m: Message, bot: Bot, group=None):
+    """Reply to a voice message with /vtext: I write down what was said. Groups only; 10 per hour per person, owner unlimited."""
+    if not m.from_user:
+        return
+    if m.chat.type == "private":
+        await m.reply("📝 /vtext works in groups: reply to a voice message there with <code>/vtext</code>.")
+        return
+    if group is not None and not group.ai_enabled:
+        return
+    rep = m.reply_to_message
+    media = (rep.voice or rep.audio) if rep else None
+    if media is None:
+        await m.reply("📝 Reply to a voice message with <code>/vtext</code> and I will write it out as text.")
+        return
+    uid = m.from_user.id
+    is_owner = uid == get_settings().owner_id
+    limit = stt.max_seconds()
+    if (media.duration or 0) > limit and not is_owner:
+        await m.reply(f"📝 That voice message is too long - I can read up to {limit} seconds.")
+        return
+    if (media.file_size or 0) > 5 * 1024 * 1024 and not is_owner:
+        await m.reply("📝 That file is too big for me to listen to.")
+        return
+    w = voice_access.vtext_wait_secs(uid)
+    if w:
+        await m.reply(f"📝 /vtext limit reached ({voice_access.vtext_limit()} per hour). Try again in {dur(w)}.")
+        return
+    voice_access.vtext_count(uid)
+    text = None
+    try:
+        async with ChatActionSender.typing(bot=bot, chat_id=m.chat.id):
+            buf = BytesIO()
+            await bot.download(media, destination=buf)
+            text = await stt.get(get_settings()).transcribe(buf.getvalue(), media.mime_type or "audio/ogg")
+    except Exception:
+        log.warning("vtext failed", exc_info=True)
+    if not text or not text.strip():
+        await m.reply("📝 I couldn't make out any words in that voice message.")
+        return
+    await rep.reply(f"📝 <b>Voice → text</b>\n<blockquote>{esc(text.strip()[:3500])}</blockquote>")
+
+
 @router.message(F.text, ~F.text.startswith("/"))
 async def chat(m: Message, bot: Bot, ai: ChatService | None, group=None):
     me = await bot.me()

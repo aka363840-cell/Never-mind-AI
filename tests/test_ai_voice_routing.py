@@ -217,3 +217,22 @@ def test_v_voice_answer_limit_is_10_per_hour():
         assert v.wait_secs(5, 100.0 + i) == 0
         v.count(5, 100.0 + i)
     assert v.wait_secs(5, 200.0) > 3000 and v.wait_secs(6, 200.0) == 0
+
+
+def test_vtext_limit_is_10_per_hour_and_owner_is_unlimited(monkeypatch):
+    from services import voiceaccess as v
+    monkeypatch.delenv("AI_VTEXT_PER_HOUR", raising=False)
+    v._vt_used.clear()
+    for i in range(10):
+        assert v.vtext_wait_secs(7, 100.0 + i) == 0
+        v.vtext_count(7, 100.0 + i)
+    assert v.vtext_wait_secs(7, 200.0) > 3000 and v.vtext_wait_secs(8, 200.0) == 0
+    monkeypatch.setattr(v, "_is_owner", lambda uid: uid == 7)
+    assert v.vtext_wait_secs(7, 200.0) == 0             # owner: no limit
+
+
+def test_vtext_handler_is_group_only_reply_based_and_keeps_audio_in_memory():
+    src = open("handlers/ai_chat.py").read()
+    seg = src[src.index("async def vtext_cmd"):src.index("async def chat(")]
+    assert 'm.chat.type == "private"' in seg and "reply_to_message" in seg and "rep.voice or rep.audio" in seg
+    assert "write(" not in seg and "open(" not in seg

@@ -138,6 +138,7 @@ DESC_LIST: list[tuple[str, str]] = [
     ('missions', '📜 Missions & achievements'),
     ('ask', '{emoji} Ask {name} anything (groups only)'),
     ('voices', '🎙 Choose my voice - buttons appear, only you can press them'),
+    ('vtext', '📝 Reply to a voice message with /vtext: I write out what was said (10 per hour, groups only)'),
     ('v', '🎙 /v <message> (or reply to a message with /v): I answer with a voice message - pick the voice with /voices (10 voice messages per hour)'),
     ('hug', '🤗 Hug someone (reply/@user)'),
     ('slap', '👋 Slap someone with a fish'),
@@ -405,7 +406,7 @@ CATEGORIES: list[tuple[str, list[str]]] = [
                          "fortune", "iq", "lucky", "rate", "waifu", "afk", "sex", "whisper", "tagall", "etagall", "welcomemsg", "leavemsg", "cancel", "members", "q", "@actions"]),
     ("Academy 🎓", ["enroll", "academy", "schedule", "study", "attend", "hangout", "rest", "club", "parttime", "exam", "grades", "classrank",
                       "rival", "rivalduel", "crush", "crushoff", "campuscouple", "campusdate", "clubs", "buddy", "adventure", "academyremind", "reportcard", "halloffame", "academyhelp"]),
-    ("🤖 AI Chat", ["ask", "voices", "v"]),
+    ("🤖 AI Chat", ["ask", "voices", "v", "vtext"]),
     ("🎵 Music", ["mxplay", "mxstartplay", "mxplayforce", "mxqueue", "mxpause", "mxresume", "mxskip", "mxprevious", "mxshuffle", "mxloop", "mxstopplay", "mxseek"]),
 ]
 OTHER = "📦 Other"
