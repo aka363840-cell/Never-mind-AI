@@ -79,6 +79,8 @@ async def claim_mission(uid: int, mission_id: int) -> tuple[str, int]:
             raise GameError("❌ Mission not complete (or already claimed).")
         await economy.apply(s, uid, wallet=m.reward, kind="mission", ref=f"mission:{m.id}")
         await add_xp(s, uid, 10)
+        if m.period == "daily" and m.mission_key != "all_daily":
+            await emit(s, uid, "daily_all")          # counts towards "finish every daily quest"
         return m.title, m.reward
 
 

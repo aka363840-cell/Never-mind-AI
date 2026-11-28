@@ -464,7 +464,9 @@ async def inventory(uid: int, page: int = 0, text_only: bool = False) -> tuple[s
 async def missions(uid: int) -> tuple[str, InlineKeyboardMarkup]:
     ms = await progress.missions_for(uid)
     ach = await progress.achievements_of(uid)
+    streak = await economy.streak_of(uid)
     lines, rows = [f"{brand.line()}\n\n🎯 <b>Missions</b>"], []
+    lines.append(f"🔥 Daily streak: <b>{streak}</b> day{'s' if streak != 1 else ''}" + (" — claim /daily every day to keep it growing." if streak else " — claim /daily to start one."))
     for period in ("daily", "weekly"):
         lines.append(f"\n<b>{period.title()}</b>")
         for m in [m for m in ms if m.period == period]:

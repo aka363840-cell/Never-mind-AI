@@ -100,6 +100,7 @@ async def hunt(uid: int, rng: random.Random | None = None) -> dict:
             raise OnCooldown(rem, "Hunting")
         kind = rng.choices([k for k, _ in HUNT_TABLE], [w for _, w in HUNT_TABLE])[0]
         out: dict = {"kind": kind}
+        await progress.emit(s, uid, "hunt")
         if kind == "diamonds":
             out["amount"] = rng.randint(50, 300)
             await economy.apply(s, uid, wallet=out["amount"], kind="hunt")

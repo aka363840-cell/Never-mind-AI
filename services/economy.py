@@ -102,6 +102,20 @@ async def claim_daily(uid: int) -> tuple[int, int, int, int]:
         return total, streak, bonus, clan_bonus
 
 
+async def streak_of(uid: int) -> int:
+    """Current /daily streak in days (0 if it already ran out)."""
+    from database.models import AppState
+    async with db.tx() as s:
+        row = await s.get(AppState, f"streak:{uid}")
+    if not row:
+        return 0
+    try:
+        n, last = row.value.split("|")
+        return int(n) if (utcnow().timestamp() - float(last)) <= R.streak_window_s else 0
+    except ValueError:
+        return 0
+
+
 async def claim_weekly(uid: int) -> int:
     async with db.tx() as s:
         rem = await cooldowns.claim(s, uid, "weekly", R.weekly_cooldown_s)
@@ -139,6 +153,7 @@ async def work(uid: int, rng: random.Random | None = None) -> tuple[str, int]:
         amount = rng.randint(R.work_min, R.work_max)
         await apply(s, uid, wallet=amount, kind="work")
         await progress.emit(s, uid, "earn", amount)
+        await progress.emit(s, uid, "work")
         return rng.choice(WORK_TEXTS), amount
 
 

@@ -68,6 +68,7 @@ async def gather(uid: int, game: str) -> tuple[str, int]:
         if amount:
             await economy.apply(s, uid, wallet=amount, kind=key)
             await progress.emit(s, uid, "earn", amount)
+        await progress.emit(s, uid, game)            # daily quests ("go fishing 3 times")
         from services import realm          # lifetime counters -> Angler / Prospector / Whale Watcher
         await realm.bump(s, uid, game)
         if game == "fish" and text.startswith("🐋"):

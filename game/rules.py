@@ -211,6 +211,10 @@ class Rules:
         ("rob_success", "Complete a successful robbery", "rob_success", 1, 200),
         ("use_power", "Use a power", "power_use", 1, 150),
         ("dungeon_clear", "Clear the dungeon", "dungeon_clear", 1, 300),
+        ("work_2", "Work 2 times", "work", 2, 150),
+        ("fish_3", "Go fishing 3 times", "fish", 3, 200),
+        ("hunt_1", "Go hunting", "hunt", 1, 150),
+        ("all_daily", "Finish every daily quest", "daily_all", 9, 500),    # goal = the other daily quests; counted when each one is claimed
     )
     weekly_missions: tuple = (
         ("w_earn_5000", "Earn 5,000 diamonds", "earn", 5000, 1000),
